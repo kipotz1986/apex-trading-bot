@@ -1,1 +1,23 @@
+# Backend Requirements
+
+# Core
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+
+# Infrastructure
 ccxt>=4.3.0
+sqlalchemy
+psycopg2-binary
+redis
+chromadb
+
+# Structlog for JSON logging
+structlog
+python-json-logger
+
+# AI Providers
+openai
+google-generativeai
+anthropic

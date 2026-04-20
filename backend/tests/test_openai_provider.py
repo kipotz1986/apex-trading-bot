@@ -1,13 +1,13 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from app.core.providers.openai_provider import OpenAIProvider
-from app.core.ai_provider import ChatMessage
+from app.core.ai_provider import ChatMessage, AIResponse
 
 class MockOpenAIResponse:
     def __init__(self, content, model, prompt_tokens, completion_tokens):
-        self.choices = [AsyncMock(message=AsyncMock(content=content))]
+        self.choices = [MagicMock(message=MagicMock(content=content))]
         self.model = model
-        self.usage = AsyncMock(
+        self.usage = MagicMock(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens
@@ -39,8 +39,8 @@ async def test_openai_analyze_shortcut():
     """Test the analyze() shortcut method."""
     provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
     
-    with patch.object(provider.chat, 'return_value', new_callable=AsyncMock) as mock_chat:
-        from app.core.ai_provider import AIResponse
+    # Correctly patch the chat method on the provider instance
+    with patch.object(provider, 'chat', new_callable=AsyncMock) as mock_chat:
         mock_chat.return_value = AIResponse(
             content="Analysis result",
             model="gpt-4o",
@@ -56,3 +56,32 @@ async def test_openai_analyze_shortcut():
         
         assert response.content == "Analysis result"
         mock_chat.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_openai_embed_success():
+    """Test the embed() method."""
+    provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
+    
+    with patch.object(provider.client.embeddings, 'create', new_callable=AsyncMock) as mock_embed:
+        mock_embed.return_value = MagicMock(data=[MagicMock(embedding=[0.1, 0.2, 0.3])])
+        
+        result = await provider.embed("test text")
+        assert result == [0.1, 0.2, 0.3]
+
+@pytest.mark.asyncio
+async def test_openai_health_check_success():
+    """Test the health_check() method success."""
+    provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
+    
+    with patch.object(provider.client.models, 'list', new_callable=AsyncMock) as mock_list:
+        mock_list.return_value = MagicMock()
+        assert await provider.health_check() is True
+
+@pytest.mark.asyncio
+async def test_openai_health_check_failure():
+    """Test the health_check() method failure."""
+    provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
+    
+    with patch.object(provider.client.models, 'list', new_callable=AsyncMock) as mock_list:
+        mock_list.side_effect = Exception("API Error")
+        assert await provider.health_check() is False

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     EXCHANGE_API_SECRET: str = ""
     EXCHANGE_TESTNET: bool = True  # True = paper trading (aman)
 
+    # === On-Chain Data ===
+    WHALE_ALERT_API_KEY: str = ""
+    GLASSNODE_API_KEY: str = ""
+    CRYPTOQUANT_API_KEY: str = ""
+
     # === Database ===
     DATABASE_URL: str = "postgresql://apex:apex_dev_password@localhost:5432/apex_trading"
     REDIS_URL: str = "redis://localhost:6379/0"

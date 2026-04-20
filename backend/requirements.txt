@@ -5,6 +5,7 @@ fastapi
 uvicorn
 pydantic
 pydantic-settings
+httpx
 
 # Infrastructure
 ccxt>=4.3.0

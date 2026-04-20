@@ -675,10 +675,14 @@ jobs:
 ```
 
 ### Definition of Done
-- [ ] File `.github/workflows/ci.yml` ada dan valid (bisa dilihat di tab Actions GitHub)
-- [ ] Pipeline berjalan otomatis saat push ke `main` atau `develop`
-- [ ] Pipeline mencakup: lint, type check, test (backend & frontend), security scan
-- [ ] Secret scan tidak menemukan API key hardcoded
+- [x] Create `feat/ci-setup` branch
+- [x] Create `.github/workflows` directory
+- [x] Implement `ci.yml` workflow
+- [x] Create Pull Request
+- [x] File `.github/workflows/ci.yml` ada dan valid (bisa dilihat di tab Actions GitHub)
+- [x] Pipeline berjalan otomatis saat push ke `main` atau `develop`
+- [x] Pipeline mencakup: lint, type check, test (backend & frontend), security scan
+- [x] Secret scan tidak menemukan API key hardcoded
 
 ### File yang Dibuat
 - `[NEW]` `.github/workflows/ci.yml`

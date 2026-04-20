@@ -10,9 +10,10 @@ Usage:
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 from app.services.exchange import ExchangeService
 from app.core.logging import get_logger
+from app.schemas.market_data import NormalizedCandle
 
 logger = get_logger(__name__)
 
@@ -37,7 +38,7 @@ class MarketDataService:
         timeframe: str = "1h",
         limit: int = 200,
         since: Optional[datetime] = None,
-    ) -> list[dict]:
+    ) -> List[NormalizedCandle]:
         """
         Ambil data candlestick/OHLCV.
 
@@ -48,15 +49,7 @@ class MarketDataService:
             since: Ambil data sejak tanggal tertentu (opsional)
 
         Returns:
-            List of dict, masing-masing berisi:
-            {
-                "timestamp": datetime,
-                "open": float,
-                "high": float,
-                "low": float,
-                "close": float,
-                "volume": float,
-            }
+            List of NormalizedCandle
         """
         if timeframe not in SUPPORTED_TIMEFRAMES:
             raise ValueError(
@@ -73,14 +66,14 @@ class MarketDataService:
 
             candles = []
             for candle in raw_data:
-                candles.append({
-                    "timestamp": datetime.fromtimestamp(candle[0] / 1000),
-                    "open": candle[1],
-                    "high": candle[2],
-                    "low": candle[3],
-                    "close": candle[4],
-                    "volume": candle[5],
-                })
+                candles.append(NormalizedCandle(
+                    timestamp=datetime.fromtimestamp(candle[0] / 1000),
+                    open=candle[1],
+                    high=candle[2],
+                    low=candle[3],
+                    close=candle[4],
+                    volume=candle[5],
+                ))
 
             logger.info("candles_fetched",
                 symbol=symbol,
@@ -98,14 +91,14 @@ class MarketDataService:
     async def get_multi_timeframe_candles(
         self,
         symbol: str,
-        timeframes: list[str] = None,
-    ) -> dict[str, list[dict]]:
+        timeframes: Optional[List[str]] = None,
+    ) -> Dict[str, List[NormalizedCandle]]:
         """
         Ambil candle dari beberapa timeframe sekaligus.
         Digunakan oleh Technical Analyst Agent untuk analisis multi-TF.
 
         Returns:
-            Dict dengan key = timeframe, value = list of candles
+            Dict dengan key = timeframe, value = list of NormalizedCandle
             {
                 "15m": [...candles...],
                 "1h": [...candles...],

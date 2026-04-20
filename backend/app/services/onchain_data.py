@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.schemas.market_data import NormalizedSentiment
 
 logger = get_logger(__name__)
 
@@ -97,7 +98,7 @@ class OnChainDataService:
 
         return result
 
-    async def get_summary(self, symbol: str = "BTC") -> Dict[str, Any]:
+    async def get_summary(self, symbol: str = "BTC") -> NormalizedSentiment:
         """Agregasi data on-chain untuk memberikan skor sentimen fundamental."""
         flows = await self.get_exchange_flows(symbol)
         whales = await self.get_whale_movements()
@@ -119,10 +120,16 @@ class OnChainDataService:
         if whale_count > 10:
             sentiment_score -= 10 # High activity can be volatile
             
-        return {
-            "symbol": symbol,
-            "sentiment_score": sentiment_score,
-            "flows": flows,
-            "whale_count": whale_count,
-            "timestamp": datetime.now().isoformat()
-        }
+        # Classify the sentiment
+        classification = "Neutral"
+        if sentiment_score <= -20:
+            classification = "Fear"
+        elif sentiment_score >= 20:
+            classification = "Greed"
+            
+        return NormalizedSentiment(
+            source="onchain_summary",
+            score=sentiment_score,
+            classification=classification,
+            timestamp=datetime.now()
+        )

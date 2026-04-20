@@ -1,0 +1,86 @@
+# ===========================
+# ENVIRONMENT & SECRETS
+# ===========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+secrets/
+config/local.*
+config/*.secret.*
+
+# ===========================
+# PYTHON
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# ===========================
+# NODE.JS / NEXT.JS
+# ===========================
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ===========================
+# DATABASE
+# ===========================
+*.db
+*.sqlite3
+*.sql.bak
+data/postgres/
+data/redis/
+data/chromadb/
+
+# ===========================
+# DOCKER
+# ===========================
+docker-compose.override.yml
+
+# ===========================
+# IDE
+# ===========================
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===========================
+# LOGS
+# ===========================
+logs/
+*.log
+
+# ===========================
+# ML / AI MODELS
+# ===========================
+models/*.pkl
+models/*.pt
+models/*.h5
+*.onnx

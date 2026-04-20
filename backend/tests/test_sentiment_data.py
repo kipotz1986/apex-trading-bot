@@ -57,5 +57,5 @@ async def test_composite_sentiment_calculation(mock_exchange_service):
         # F&G Score: (75-50)*2 = 50
         # FR Score: (0.001*10000)/3 = 3.33
         # Composite: 50*0.7 + 3.33*0.3 = 35 + 1 = 36
-        assert result["composite_score"] > 0
-        assert result["composite_score"] == 36.0 # (50*0.7) + (3.33*0.3) = 35 + 0.999 = 36.00
+        assert result.score > 0
+        assert result.score == 36.0 # (50*0.7) + (3.33*0.3) = 35 + 0.999 = 36.00

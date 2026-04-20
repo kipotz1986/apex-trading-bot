@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.schemas.market_data import NormalizedNews
 
 logger = get_logger(__name__)
 
@@ -30,7 +31,7 @@ class NewsFeedService:
         currencies: Optional[List[str]] = None, 
         filter: str = "hot",
         kind: str = "news"
-    ) -> List[Dict[str, Any]]:
+    ) -> List[NormalizedNews]:
         """
         Ambil berita terbaru dari CryptoPanic.
         
@@ -62,15 +63,18 @@ class NewsFeedService:
                     
                     normalized_news = []
                     for item in results:
-                        normalized_news.append({
-                            "title": item.get("title"),
-                            "source": item.get("domain"),
-                            "url": item.get("url"),
-                            "timestamp": item.get("created_at"),
-                            "importance": self._calculate_importance(item),
-                            "currencies": [c.get("code") for c in item.get("currencies", [])],
-                            "votes": item.get("votes")
-                        })
+                        # Parse string timestamp to datetime if possible, but pydantic handles strings.
+                        timestamp_str = item.get("created_at")
+                        dt_obj = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")) if timestamp_str else datetime.now()
+
+                        normalized_news.append(NormalizedNews(
+                            title=item.get("title", ""),
+                            source=item.get("domain", ""),
+                            timestamp=dt_obj,
+                            url=item.get("url"),
+                            importance=self._calculate_importance(item),
+                            currencies=[c.get("code") for c in item.get("currencies", [])]
+                        ))
                     
                     logger.info("news_fetched", count=len(normalized_news))
                     return normalized_news

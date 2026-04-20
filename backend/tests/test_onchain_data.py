@@ -65,5 +65,5 @@ async def test_onchain_summary_aggregation():
         
         summary = await service.get_summary("BTC")
         
-        assert summary["sentiment_score"] > 0
-        assert summary["whale_count"] == 0
+        assert summary.score > 0
+        assert summary.classification == "Greed"

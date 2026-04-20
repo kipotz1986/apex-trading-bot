@@ -12,9 +12,11 @@ Usage:
 """
 
 import httpx
+from datetime import datetime
 from typing import Dict, Any, Optional
 from app.services.exchange import ExchangeService
 from app.core.logging import get_logger
+from app.schemas.market_data import NormalizedSentiment
 
 logger = get_logger(__name__)
 
@@ -76,7 +78,7 @@ class SentimentDataService:
             logger.error("exchange_sentiment_error", symbol=symbol, error=str(e))
             return {"funding_rate": 0.0, "open_interest": 0.0}
 
-    async def get_composite_sentiment(self, symbol: str) -> Dict[str, Any]:
+    async def get_composite_sentiment(self, symbol: str) -> NormalizedSentiment:
         """Hitung skor sentimen gabungan dari -100 ke 100."""
         fng = await self.get_fear_greed_index()
         exc = await self.get_exchange_sentiment(symbol)
@@ -94,12 +96,25 @@ class SentimentDataService:
         # Composite: 70% F&G, 30% Exchange Sentiment (Bisa diadjust)
         composite_score = (fng_score * 0.7) + (fr_score * 0.3)
         
-        result = {
-            "symbol": symbol,
-            "composite_score": round(composite_score, 2),
-            "fear_greed": fng,
-            "exchange": exc
-        }
+        score_round = round(composite_score, 2)
         
-        logger.info("composite_sentiment_calculated", symbol=symbol, score=result["composite_score"])
+        # Simple classification based on score
+        classification_str = "Neutral"
+        if score_round >= 50:
+            classification_str = "Extreme Greed"
+        elif score_round >= 10:
+            classification_str = "Greed"
+        elif score_round <= -50:
+            classification_str = "Extreme Fear"
+        elif score_round <= -10:
+            classification_str = "Fear"
+            
+        result = NormalizedSentiment(
+            source="composite",
+            score=score_round,
+            classification=classification_str,
+            timestamp=datetime.now()
+        )
+        
+        logger.info("composite_sentiment_calculated", symbol=symbol, score=result.score)
         return result

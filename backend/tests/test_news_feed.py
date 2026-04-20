@@ -29,9 +29,9 @@ async def test_get_latest_news_success():
         news = await service.get_latest_news(currencies=["BTC"])
         
         assert len(news) == 1
-        assert news[0]["title"] == "BTC hitting new ATH"
-        assert news[0]["importance"] == "high"
-        assert "BTC" in news[0]["currencies"]
+        assert news[0].title == "BTC hitting new ATH"
+        assert news[0].importance == "high"
+        assert "BTC" in news[0].currencies
 
 @pytest.mark.asyncio
 async def test_get_latest_news_no_key():

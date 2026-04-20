@@ -1,0 +1,57 @@
+services:
+  # ============================================
+  # PostgreSQL + TimescaleDB (Database Utama)
+  # ============================================
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: apex-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: apex
+      POSTGRES_PASSWORD: apex_dev_password
+      POSTGRES_DB: apex_trading
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apex -d apex_trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis (Cache, Pub/Sub, Task Queue)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: apex-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # ChromaDB (Vector Database untuk Self-Learning)
+  # ============================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: apex-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+
+volumes:
+  postgres_data:
+  redis_data:
+  chromadb_data:

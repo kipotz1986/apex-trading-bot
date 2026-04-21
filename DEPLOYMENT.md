@@ -32,6 +32,40 @@ Panduan ini akan membimbing Anda untuk menjalankan **APEX Trading Bot** di serve
 
 ---
 
+## Langkah 1.5: Setup Keamanan (WAJIB)
+
+Sebelum menjalankan bot, Anda harus men-generate secret keys dan password hash yang aman.
+
+### 1. Generate JWT Secret
+Gunakan command ini untuk membuat string random 32-byte:
+```bash
+openssl rand -hex 32
+```
+Copy hasilnya ke `JWT_SECRET` di `.env`.
+
+### 2. Generate Admin Password Hash
+Bot tidak menyimpan password dalam bentuk teks. Gunakan script ini untuk men-generate hash bcrypt:
+```bash
+python3 -c "from passlib.context import CryptContext; pc=CryptContext(schemes=['bcrypt']); print(pc.hash(input('Masukkan Password: ')))"
+```
+Copy hasilnya ke `ADMIN_PASSWORD_HASH` di `.env`.
+
+### 3. Generate TOTP Secret (2FA)
+Gunakan command ini untuk membuat Base32 secret untuk Google Authenticator/Authy:
+```bash
+python3 -c "import pyotp; print(pyotp.random_base32())"
+```
+Copy hasilnya ke `TOTP_SECRET` di `.env`.
+
+### 4. Generate Encryption Key (AES-256)
+API Key bursa Anda akan disimpan terenkripsi. Generate key 32-byte:
+```bash
+python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+```
+Copy hasilnya ke `ENCRYPTION_KEY` di `.env`.
+
+---
+
 ## Langkah 2: Build & Start Services
 
 Jalankan seluruh stack aplikasi menggunakan Docker Compose:

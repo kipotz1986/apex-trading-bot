@@ -41,6 +41,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         )
     
     # Check password hash (if set, otherwise allow 'admin' for initial setup)
+    if settings.ADMIN_PASSWORD_HASH:
         if not security.verify_password(form_data.password, settings.ADMIN_PASSWORD_HASH):
             log_audit(db, "login_failed", form_data.username, {"reason": "wrong_password"}, ip_address=request.client.host)
             raise HTTPException(
@@ -48,9 +49,9 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                 detail="Incorrect username or password",
             )
     else:
-        # Emergency fallback for initial setup
+        # Emergency fallback for initial setup only
         if form_data.password != "admin":
-             raise HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
             )

@@ -43,21 +43,6 @@ async def get_trade_history(
         "trades": trades
     }
 
-@router.get("/{trade_id}")
-async def get_trade_detail(
-    trade_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: str = Depends(deps.get_current_user)
-):
-    """
-    Returns detailed info for a single trade, including AI reasoning.
-    """
-    trade = db.query(Order).filter(Order.id == trade_id).first()
-    if not trade:
-        raise HTTPException(status_code=404, detail="Trade not found")
-        
-    return trade
-
 @router.get("/stats")
 async def get_trade_stats(
     db: Session = Depends(deps.get_db),
@@ -87,3 +72,18 @@ async def get_trade_stats(
         "profit_factor": round(profit_factor, 2),
         "avg_trade": round(total_pnl / len(closed_orders), 2)
     }
+
+@router.get("/{trade_id}")
+async def get_trade_detail(
+    trade_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: str = Depends(deps.get_current_user)
+):
+    """
+    Returns detailed info for a single trade, including AI reasoning.
+    """
+    trade = db.query(Order).filter(Order.id == trade_id).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+        
+    return trade

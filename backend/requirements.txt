@@ -18,6 +18,11 @@ chromadb
 structlog
 python-json-logger
 
+# Data Analysis
+pandas>=2.2.0
+pandas-ta>=0.3.14b
+numpy>=1.26.0
+
 # AI Providers
 openai
 google-generativeai

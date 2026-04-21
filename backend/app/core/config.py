@@ -28,10 +28,9 @@ class Settings(BaseSettings):
     EXCHANGE_API_SECRET: str = ""
     EXCHANGE_TESTNET: bool = True  # True = paper trading (aman)
 
-    # === On-Chain Data ===
-    WHALE_ALERT_API_KEY: str = ""
-    GLASSNODE_API_KEY: str = ""
-    CRYPTOQUANT_API_KEY: str = ""
+    # === On-Chain Data (Free Providers) ===
+    COINGECKO_API_KEY: str = ""  # Opsional, meningkatkan rate limit
+    ETHERSCAN_API_KEY: str = ""  # Free tier: 5 req/detik, daftar di etherscan.io
     CRYPTOPANIC_API_KEY: str = ""
 
     # === Database ===

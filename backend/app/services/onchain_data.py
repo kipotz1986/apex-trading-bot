@@ -1,13 +1,16 @@
 """
-On-Chain Data Service.
+On-Chain Data Service (Free Providers).
 
-Mengambil data dari blockchain via API pihak ketiga (WhaleAlert, Glassnode, CryptoQuant).
-Digunakan untuk analisa fundamental dan deteksi pergerakan uang besar (whale).
+Mengambil data blockchain dan market metrics menggunakan API gratis:
+1. CoinGecko — Market metrics, trending, global data
+2. Blockchain.com — BTC on-chain stats (tanpa API key)
+3. Etherscan — ETH whale tracking, large transfers (free tier)
 
 Usage:
     onchain = OnChainDataService()
-    whales = await onchain.get_whale_movements()
-    flows = await onchain.get_exchange_flows("BTC")
+    btc_stats = await onchain.get_btc_onchain_stats()
+    eth_whales = await onchain.get_eth_large_transfers()
+    summary = await onchain.get_summary("BTC")
 """
 
 import httpx
@@ -19,116 +22,264 @@ from app.schemas.market_data import NormalizedSentiment
 
 logger = get_logger(__name__)
 
+
 class OnChainDataService:
-    """Service untuk mengambil data metrik blockchain."""
+    """Service untuk mengambil data metrik blockchain dari provider gratis."""
 
     def __init__(self):
-        self.whale_key = settings.WHALE_ALERT_API_KEY
-        self.glassnode_key = settings.GLASSNODE_API_KEY
-        self.cryptoquant_key = settings.CRYPTOQUANT_API_KEY
+        self.coingecko_key = settings.COINGECKO_API_KEY
+        self.etherscan_key = settings.ETHERSCAN_API_KEY
         self.timeout = 10.0
 
-    async def get_whale_movements(self, min_value_usd: int = 500000) -> List[Dict[str, Any]]:
+        # Base URLs
+        self.coingecko_url = "https://api.coingecko.com/api/v3"
+        self.blockchain_url = "https://api.blockchain.info"
+        self.etherscan_url = "https://api.etherscan.io/api"
+
+    # ─── CoinGecko: Market Metrics ─────────────────────────────────────
+
+    async def get_global_market(self) -> Dict[str, Any]:
         """
-        Ambil transaksi besar (whale) terbaru.
-        
-        Args:
-            min_value_usd: Batas minimal nilai transaksi yang dianggap whale.
+        Ambil global market metrics dari CoinGecko.
+        Contoh: total market cap, volume 24h, BTC dominance.
         """
-        if not self.whale_key:
-            logger.warning("whale_alert_api_key_missing")
+        url = f"{self.coingecko_url}/global"
+        headers = {}
+        if self.coingecko_key:
+            headers["x-cg-demo-api-key"] = self.coingecko_key
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    result = {
+                        "total_market_cap_usd": data.get("total_market_cap", {}).get("usd", 0),
+                        "total_volume_24h_usd": data.get("total_volume", {}).get("usd", 0),
+                        "btc_dominance": data.get("market_cap_percentage", {}).get("btc", 0),
+                        "active_cryptocurrencies": data.get("active_cryptocurrencies", 0),
+                        "market_cap_change_24h_pct": data.get("market_cap_change_percentage_24h_usd", 0),
+                    }
+                    logger.info("coingecko_global_fetched", btc_dominance=result["btc_dominance"])
+                    return result
+                else:
+                    logger.error("coingecko_global_error", status=response.status_code)
+                    return {}
+        except Exception as e:
+            logger.error("coingecko_global_failed", error=str(e))
+            return {}
+
+    async def get_trending_coins(self) -> List[Dict[str, Any]]:
+        """Ambil daftar coin yang sedang trending dari CoinGecko."""
+        url = f"{self.coingecko_url}/search/trending"
+        headers = {}
+        if self.coingecko_key:
+            headers["x-cg-demo-api-key"] = self.coingecko_key
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    coins = response.json().get("coins", [])
+                    result = []
+                    for coin in coins:
+                        item = coin.get("item", {})
+                        result.append({
+                            "name": item.get("name"),
+                            "symbol": item.get("symbol"),
+                            "market_cap_rank": item.get("market_cap_rank"),
+                            "score": item.get("score"),
+                        })
+                    logger.info("coingecko_trending_fetched", count=len(result))
+                    return result
+                return []
+        except Exception as e:
+            logger.error("coingecko_trending_failed", error=str(e))
             return []
 
-        url = "https://api.whale-alert.io/v1/transactions"
-        params = {
-            "api_key": self.whale_key,
-            "min_value": min_value_usd,
+    # ─── Blockchain.com: BTC On-Chain Stats ────────────────────────────
+
+    async def get_btc_onchain_stats(self) -> Dict[str, Any]:
+        """
+        Ambil statistik on-chain BTC dari Blockchain.com (GRATIS, tanpa API key).
+        Data: hashrate, mempool size, avg block size, unconfirmed txs.
+        """
+        result = {
+            "hash_rate": 0,
+            "mempool_size": 0,
+            "avg_block_size": 0,
+            "unconfirmed_txs": 0,
+            "difficulty": 0,
         }
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, params=params)
-                if response.status_code == 200:
-                    data = response.json()
-                    transactions = data.get("transactions", [])
-                    logger.info("whale_movements_fetched", count=len(transactions))
-                    return transactions
-                else:
-                    logger.error("whale_alert_api_error", status=response.status_code)
-                    return []
+                # Blockchain.com menyediakan endpoint stats mentah
+                stats_response = await client.get(f"{self.blockchain_url}/stats")
+                if stats_response.status_code == 200:
+                    data = stats_response.json()
+                    result.update({
+                        "hash_rate": data.get("hash_rate", 0),
+                        "avg_block_size": data.get("blocks_avg", 0),
+                        "difficulty": data.get("difficulty", 0),
+                        "n_blocks_total": data.get("n_blocks_total", 0),
+                        "minutes_between_blocks": data.get("minutes_between_blocks", 0),
+                    })
+
+                # Unconfirmed transaction count
+                unconf_response = await client.get(f"{self.blockchain_url}/q/unconfirmedcount")
+                if unconf_response.status_code == 200:
+                    result["unconfirmed_txs"] = int(unconf_response.text.strip())
+
+            logger.info("blockchain_stats_fetched", hash_rate=result["hash_rate"])
+            return result
+
         except Exception as e:
-            logger.error("whale_alert_fetch_failed", error=str(e))
+            logger.error("blockchain_stats_failed", error=str(e))
+            return result
+
+    # ─── Etherscan: ETH Large Transfers ────────────────────────────────
+
+    async def get_eth_large_transfers(self, min_value_eth: float = 100.0) -> List[Dict[str, Any]]:
+        """
+        Ambil transfer ETH besar terbaru dari Etherscan (free tier).
+        Menggunakan internal transaction list dari block terbaru.
+
+        Args:
+            min_value_eth: Minimal jumlah ETH yang dianggap whale transfer.
+        """
+        if not self.etherscan_key:
+            logger.warning("etherscan_api_key_missing")
             return []
 
-    async def get_exchange_flows(self, symbol: str = "BTC") -> Dict[str, Any]:
-        """
-        Ambil aliran dana bursa (Inflow vs Outflow).
-        Menggunakan Glassnode sebagai primary, CryptoQuant sebagai fallback.
-        """
-        result = {"inflow": 0.0, "outflow": 0.0, "net_flow": 0.0, "provider": None}
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Ambil block terbaru
+                params = {
+                    "module": "proxy",
+                    "action": "eth_blockNumber",
+                    "apikey": self.etherscan_key,
+                }
+                block_response = await client.get(self.etherscan_url, params=params)
+                if block_response.status_code != 200:
+                    return []
 
-        # 1. Try Glassnode
-        if self.glassnode_key:
-            try:
-                # Contoh endpoint Glassnode untuk inflow (sangat simplified)
-                # Di produksi, kita akan butuh list endpoint yang benar sesuai dokumentasi mereka
-                url = f"https://api.glassnode.com/v1/metrics/exchange/net_flow_sum"
-                params = {"api_key": self.glassnode_key, "a": symbol.lower(), "i": "24h"}
-                
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.get(url, params=params)
-                    if response.status_code == 200:
-                        data = response.json()
-                        # Glassnode return list of objects [ {t: timestamp, v: value} ]
-                        if data and len(data) > 0:
-                            net_flow = data[-1].get("v", 0.0)
-                            result.update({
-                                "net_flow": net_flow,
-                                "provider": "glassnode"
-                            })
-                            logger.info("exchange_flows_fetched", symbol=symbol, provider="glassnode")
-                            return result
-            except Exception as e:
-                logger.warning("glassnode_fetch_failed", error=str(e))
+                latest_block = block_response.json().get("result", "0x0")
 
-        # 2. Fallback to CryptoQuant (Jika Glassnode gagal atau key tidak ada)
-        if self.cryptoquant_key:
-            # Implementasi fallback ke CryptoQuant di sini jika perlu
-            pass
+                # Ambil transaksi dari block terbaru
+                tx_params = {
+                    "module": "proxy",
+                    "action": "eth_getBlockByNumber",
+                    "tag": latest_block,
+                    "boolean": "true",
+                    "apikey": self.etherscan_key,
+                }
+                tx_response = await client.get(self.etherscan_url, params=tx_params)
+                if tx_response.status_code != 200:
+                    return []
 
-        return result
+                block_data = tx_response.json().get("result", {})
+                transactions = block_data.get("transactions", [])
+
+                # Filter by value (ETH in Wei, 1 ETH = 10^18 Wei)
+                min_wei = int(min_value_eth * 10**18)
+                large_txs = []
+                for tx in transactions:
+                    value_hex = tx.get("value", "0x0")
+                    value_wei = int(value_hex, 16) if value_hex else 0
+                    if value_wei >= min_wei:
+                        large_txs.append({
+                            "hash": tx.get("hash"),
+                            "from": tx.get("from"),
+                            "to": tx.get("to"),
+                            "value_eth": value_wei / 10**18,
+                            "block": tx.get("blockNumber"),
+                        })
+
+                logger.info("etherscan_large_transfers_fetched", count=len(large_txs))
+                return large_txs
+
+        except Exception as e:
+            logger.error("etherscan_fetch_failed", error=str(e))
+            return []
+
+    # ─── Etherscan: Gas Tracker ────────────────────────────────────────
+
+    async def get_eth_gas_price(self) -> Dict[str, Any]:
+        """Ambil gas price ETH terkini dari Etherscan."""
+        if not self.etherscan_key:
+            return {"low": 0, "average": 0, "high": 0}
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                params = {
+                    "module": "gastracker",
+                    "action": "gasoracle",
+                    "apikey": self.etherscan_key,
+                }
+                response = await client.get(self.etherscan_url, params=params)
+                if response.status_code == 200:
+                    data = response.json().get("result", {})
+                    return {
+                        "low": float(data.get("SafeGasPrice", 0)),
+                        "average": float(data.get("ProposeGasPrice", 0)),
+                        "high": float(data.get("FastGasPrice", 0)),
+                    }
+                return {"low": 0, "average": 0, "high": 0}
+        except Exception as e:
+            logger.error("etherscan_gas_failed", error=str(e))
+            return {"low": 0, "average": 0, "high": 0}
+
+    # ─── Aggregated Summary ────────────────────────────────────────────
 
     async def get_summary(self, symbol: str = "BTC") -> NormalizedSentiment:
-        """Agregasi data on-chain untuk memberikan skor sentimen fundamental."""
-        flows = await self.get_exchange_flows(symbol)
-        whales = await self.get_whale_movements()
-        
-        # Logika scoring sederhana:
-        # Net flow positif (banyak masuk ke exchange) = Bearish
-        # Banyak whale transfer besar ke exchange = Bearish
-        # Banyak whale transfer keluar dari exchange = Bullish
-        
+        """
+        Agregasi data on-chain untuk memberikan skor sentimen fundamental.
+
+        Skor dihitung berdasarkan:
+        - BTC dominance trend (dari CoinGecko)
+        - Market cap change 24h (dari CoinGecko)
+        - BTC unconfirmed tx count (dari Blockchain.com - mempool congestion)
+        """
+        global_market = await self.get_global_market()
+        btc_stats = await self.get_btc_onchain_stats()
+
         sentiment_score = 0  # -100 (Bearish) to 100 (Bullish)
-        
-        if flows["net_flow"] > 0:
-            sentiment_score -= 20
-        elif flows["net_flow"] < 0:
-            sentiment_score += 20
-            
-        # Analisis whale (sementara hanya count)
-        whale_count = len(whales)
-        if whale_count > 10:
-            sentiment_score -= 10 # High activity can be volatile
-            
-        # Classify the sentiment
+
+        # 1. Market cap change 24h
+        mc_change = global_market.get("market_cap_change_24h_pct", 0)
+        if mc_change > 3:
+            sentiment_score += 25
+        elif mc_change > 0:
+            sentiment_score += 10
+        elif mc_change < -3:
+            sentiment_score -= 25
+        elif mc_change < 0:
+            sentiment_score -= 10
+
+        # 2. BTC Dominance > 50% = flight to safety (slightly bearish for alts)
+        btc_dom = global_market.get("btc_dominance", 50)
+        if btc_dom > 55:
+            sentiment_score -= 5  # Capital leaving alts
+        elif btc_dom < 40:
+            sentiment_score += 5  # Alt season
+
+        # 3. Mempool congestion (many unconfirmed txs = network busy = high demand)
+        unconfirmed = btc_stats.get("unconfirmed_txs", 0)
+        if unconfirmed > 100000:
+            sentiment_score += 10  # Network sangat sibuk
+        elif unconfirmed > 50000:
+            sentiment_score += 5
+
+        # Classify
         classification = "Neutral"
-        if sentiment_score <= -20:
-            classification = "Fear"
-        elif sentiment_score >= 20:
-            classification = "Greed"
-            
+        if sentiment_score >= 20:
+            classification = "Bullish"
+        elif sentiment_score <= -20:
+            classification = "Bearish"
+
         return NormalizedSentiment(
-            source="onchain_summary",
+            source="onchain_free",
             score=sentiment_score,
             classification=classification,
             timestamp=datetime.now()

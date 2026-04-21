@@ -22,6 +22,8 @@ from app.utils.prompts import get_prompt
 from app.services.regime_detector import RegimeDetector
 from app.services.regime_strategy import RegimeStrategy
 from app.services.agent_scorer import AgentScorer
+from app.services.execution import ExecutionEngine
+from app.services.pre_trade_validator import PreTradeValidator
 
 logger = get_logger(__name__)
 
@@ -40,7 +42,9 @@ class MasterOrchestrator:
         consensus_engine: Any,
         regime_detector: RegimeDetector,
         regime_strategy: RegimeStrategy,
-        agent_scorer: AgentScorer
+        agent_scorer: AgentScorer,
+        execution_engine: ExecutionEngine,
+        pre_trade_validator: PreTradeValidator
     ):
         self.ai = ai_provider
         self.technical = technical_agent
@@ -52,6 +56,8 @@ class MasterOrchestrator:
         self.regime_detector = regime_detector
         self.regime_strategy = regime_strategy
         self.agent_scorer = agent_scorer
+        self.executor = execution_engine
+        self.validator = pre_trade_validator
         
         # Load prompt untuk Judge (Debate Protocol)
         try:
@@ -133,29 +139,23 @@ class MasterOrchestrator:
                     confidence=consensus_result["confidence"],
                     consensus_score=consensus_result["score"],
                     reasoning=consensus_result["reasoning"],
-                    agent_signals=agent_signals
+                    agent_signals=agent_signals,
+                    market_regime=regime_data["regime"]
                 )
             
+            # Get current price from candles for validation
+            current_price = market_data.get("candles", [])[-1].get("close") if market_data.get("candles") else 0.0
+
             risk_res = await self.risk_manager.analyze(
                 symbol=symbol,
                 side=side,
                 trade_size_usd=consensus_result["proposed_size"],
                 portfolio=portfolio,
-                market_volatility=market_data.get("regime", "normal")
+                market_volatility=regime_data["regime"]
             )
             
-            if risk_res.decision == "REJECT":
-                return TradeDecision(
-                    symbol=symbol,
-                    action="HOLD",
-                    confidence=consensus_result["confidence"],
-                    consensus_score=consensus_result["score"],
-                    reasoning=f"REJECTED BY RISK MANAGER: {risk_res.reasoning}",
-                    agent_signals=agent_signals
-                )
-
-            # 5. Build Final Decision
-            return TradeDecision(
+            # Create decision object
+            decision = TradeDecision(
                 symbol=symbol,
                 action=consensus_result["action"],
                 confidence=consensus_result["confidence"],
@@ -168,6 +168,53 @@ class MasterOrchestrator:
                 agent_signals=agent_signals,
                 market_regime=regime_data["regime"]
             )
+
+            if risk_res.decision == "REJECT":
+                decision.action = "HOLD"
+                decision.reasoning = f"REJECTED BY RISK MANAGER: {risk_res.reasoning}"
+                return decision
+
+            # 5. Pre-Trade Validation Gateway
+            is_valid, reject_reason = await self.validator.validate(
+                decision=decision,
+                portfolio=portfolio,
+                market_price=current_price
+            )
+
+            if not is_valid:
+                decision.action = "HOLD"
+                decision.reasoning = f"PRE-TRADE VALIDATION FAILED: {reject_reason}"
+                return decision
+
+            # 6. EXECUTE!
+            logger.info("executing_trade", symbol=symbol, side=side, amount=decision.position_size_usd)
+            
+            # Convert USD size to Asset Amount (Simplified: size / price)
+            asset_amount = decision.position_size_usd / current_price if current_price > 0 else 0
+            
+            if asset_amount <= 0:
+                decision.action = "HOLD"
+                decision.reasoning = "Calculated asset amount is zero."
+                return decision
+
+            res = await self.executor.open_position(
+                symbol=symbol,
+                side=side,
+                amount=asset_amount,
+                order_type="MARKET", # Default to market for auto-execution
+                leverage=decision.leverage,
+                stop_loss=decision.stop_loss,
+                take_profits=decision.take_profit,
+                reasoning=decision.reasoning
+            )
+
+            if res:
+                decision.reasoning += f" | EXECUTED ID: {res.exchange_order_id}"
+            else:
+                decision.action = "HOLD"
+                decision.reasoning += " | EXECUTION FAILED AT EXCHANGE"
+
+            return decision
 
         except Exception as e:
             logger.error("orchestrator_decision_failed", error=str(e))

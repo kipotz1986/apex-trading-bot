@@ -37,15 +37,17 @@ async def get_decision_log(
     
     decisions = []
     for o in orders:
-        reasoning = o.metadata_json.get("reasoning", "No detail available")
+        # Use CORRECT column name 'meta_data' from Order model
+        metadata = o.meta_data if o.meta_data else {}
+        reasoning = metadata.get("reasoning", "No detail available")
         decisions.append({
             "id": o.id,
             "timestamp": o.created_at,
             "symbol": o.symbol,
             "action": o.side,
             "reasoning": reasoning,
-            "consensus_score": o.metadata_json.get("consensus_score", 0.0),
-            "agent_signals": o.metadata_json.get("agent_signals", {})
+            "consensus_score": metadata.get("consensus_score", 0.0),
+            "agent_signals": metadata.get("agent_signals", {})
         })
         
     return decisions

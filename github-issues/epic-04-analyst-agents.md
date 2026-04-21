@@ -232,11 +232,11 @@ Output MUST be valid JSON with this structure:
 ```
 
 ### Definition of Done
-- [ ] Semua 8 indikator teknikal dihitung dengan benar
-- [ ] Multi-timeframe analysis berfungsi (15m, 1h, 4h, 1d)
-- [ ] AI menginterpretasi indikator dan menghasilkan sinyal JSON
-- [ ] Output berupa `AgentSignal` yang terstruktur
-- [ ] Unit test: input data → indikator dihitung → sinyal dihasilkan
+- [x] Semua 8 indikator teknikal dihitung dengan benar
+- [x] Multi-timeframe analysis berfungsi (15m, 1h, 4h, 1d)
+- [x] AI menginterpretasi indikator dan menghasilkan sinyal JSON
+- [x] Output berupa `AgentSignal` yang terstruktur
+- [x] Unit test: input data → indikator dihitung → sinyal dihasilkan
 
 ### File yang Dibuat
 - `[NEW]` `backend/app/agents/technical.py`
@@ -266,10 +266,10 @@ Contoh ideal: 1D = uptrend, 4H = uptrend, 1H = pullback ke support → **BUY** (
 4. Output metadata harus menyertakan alignment status
 
 ### Definition of Done
-- [ ] Alignment detection berfungsi
-- [ ] Confidence diboost saat TF sejalan
-- [ ] Confidence dikurangi saat TF berlawanan
-- [ ] AI mempertimbangkan alignment dalam reasoning
+- [x] Alignment detection berfungsi
+- [x] Confidence diboost saat TF sejalan
+- [x] Confidence dikurangi saat TF berlawanan
+- [x] AI mempertimbangkan alignment dalam reasoning
 
 ---
 

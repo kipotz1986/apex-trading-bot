@@ -40,3 +40,4 @@ class NormalizedNews(BaseModel):
     url: Optional[str] = None
     importance: str = Field(description="low, medium, high")
     currencies: List[str] = Field(default_factory=list)
+    sentiment_score: float = Field(default=0.0, description="Skor sentimen berita: -1.0 s/d 1.0")

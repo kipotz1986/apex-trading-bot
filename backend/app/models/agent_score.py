@@ -3,7 +3,7 @@ Agent Score Model.
 Menyimpan akurasi dan bobot setiap agent.
 """
 
-from sqlalchemy import Column, String, Float, DateTime
+from sqlalchemy import Column, String, Float, DateTime, Integer
 from datetime import datetime
 from app.core.database import Base
 
@@ -14,6 +14,6 @@ class AgentScore(Base):
     agent_name = Column(String, primary_key=True, index=True)
     score = Column(Float, default=100.0)  # Skor performa (ELO-like or straight accuracy)
     weight = Column(Float, default=0.25)  # Bobot voting (0.0 - 1.0)
-    total_trades = Column(Float, default=0)
-    successful_trades = Column(Float, default=0)
+    total_trades = Column(Integer, default=0)
+    successful_trades = Column(Integer, default=0)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

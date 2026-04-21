@@ -24,6 +24,8 @@ from app.services.regime_strategy import RegimeStrategy
 from app.services.agent_scorer import AgentScorer
 from app.services.execution import ExecutionEngine
 from app.services.pre_trade_validator import PreTradeValidator
+from app.services.learning.state_space import StateSpace
+from app.services.learning.pattern_memory import PatternMemory
 
 logger = get_logger(__name__)
 
@@ -44,7 +46,9 @@ class MasterOrchestrator:
         regime_strategy: RegimeStrategy,
         agent_scorer: AgentScorer,
         execution_engine: ExecutionEngine,
-        pre_trade_validator: PreTradeValidator
+        pre_trade_validator: PreTradeValidator,
+        state_space: StateSpace,
+        pattern_memory: PatternMemory
     ):
         self.ai = ai_provider
         self.technical = technical_agent
@@ -58,6 +62,8 @@ class MasterOrchestrator:
         self.agent_scorer = agent_scorer
         self.executor = execution_engine
         self.validator = pre_trade_validator
+        self.state_space = state_space
+        self.pattern_memory = pattern_memory
         
         # Load prompt untuk Judge (Debate Protocol)
         try:
@@ -136,6 +142,19 @@ class MasterOrchestrator:
 
             # Apply Regime Strategy parameters on final consensus (after debate)
             consensus_result = self.regime_strategy.adjust_decision(consensus_result, regime_data)
+
+            # 3.5 Pattern Memory Boost (Self-Learning)
+            state_vec = self.state_space.build_vector(market_data, portfolio, agent_signals)
+            experience = self.pattern_memory.get_market_experience(state_vec.tolist())
+            
+            if experience["sample_size"] >= 3:
+                wr = experience["win_rate"]
+                if wr > 0.7:
+                    consensus_result["confidence"] += 0.1
+                    consensus_result["reasoning"] += f" | Pattern Memory Boost: {wr:.0%} WR in similar conditions."
+                elif wr < 0.3:
+                    consensus_result["confidence"] -= 0.15
+                    consensus_result["reasoning"] += f" | Pattern Memory Warning: Only {wr:.0%} WR in similar conditions."
 
             # 4. Final Risk Validation (Veto Power)
             # Konversi consensus action ke side

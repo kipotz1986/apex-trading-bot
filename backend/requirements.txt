@@ -23,7 +23,10 @@ pandas>=2.2.0
 pandas-ta>=0.3.14b
 numpy>=1.26.0
 
-# AI Providers
+# AI & Machine Learning
 openai
 google-generativeai
 anthropic
+stable-baselines3>=2.3.0
+gymnasium>=0.29.0
+scikit-learn

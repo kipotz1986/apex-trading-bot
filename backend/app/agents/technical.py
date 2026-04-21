@@ -18,6 +18,7 @@ from datetime import datetime
 from app.core.ai_provider import AIProvider
 from app.core.logging import get_logger
 from app.schemas.agent_signal import AgentSignal
+from app.utils.prompts import get_prompt
 
 logger = get_logger(__name__)
 
@@ -27,40 +28,9 @@ class TechnicalAnalystAgent:
 
     AGENT_NAME = "technical_analyst"
 
-    # System prompt yang menjelaskan siapa agent ini
-    SYSTEM_PROMPT = """You are an expert Technical Analyst for cryptocurrency markets.
-You analyze price data using technical indicators and produce trading signals.
-
-Your analysis must be:
-1. Data-driven — base your signal ONLY on the indicators provided.
-2. Multi-timeframe — consider alignment across timeframes. 
-   - A signals is much stronger if it's aligned across 15m, 1h, 4h, and 1D.
-   - If timeframes conflict, prioritize the higher timeframes for trend and lower for entry.
-3. Conservative — when in doubt, signal NEUTRAL.
-4. Specific — state exact indicator values that support your conclusion.
-
-Output MUST be valid JSON with this structure:
-{
-    "signal": "STRONG_BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG_SELL",
-    "confidence": 0.0 to 1.0,
-    "reasoning": "explanation in 2-3 sentences",
-    "key_levels": {
-        "support": [price1, price2],
-        "resistance": [price1, price2]
-    },
-    "indicators_summary": {
-        "trend": "bullish" | "bearish" | "neutral",
-        "momentum": "bullish" | "bearish" | "neutral",
-        "volatility": "high" | "normal" | "low"
-    },
-    "alignment": {
-        "is_aligned": true/false,
-        "details": "e.g. 4H and 1D are bullish, 15m is neutral"
-    }
-}"""
-
     def __init__(self, ai_provider: AIProvider):
         self.ai = ai_provider
+        self.system_prompt = get_prompt("technical_analyst")
 
     def calculate_indicators(self, df: pd.DataFrame) -> dict:
         """
@@ -193,7 +163,7 @@ Output MUST be valid JSON with this structure:
             )
 
             response = await self.ai.analyze(
-                system_prompt=self.SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,

@@ -12,6 +12,7 @@ from app.core.ai_provider import AIProvider
 from app.core.logging import get_logger
 from app.schemas.agent_signal import AgentSignal
 from app.schemas.market_data import NormalizedSentiment
+from app.utils.prompts import get_prompt
 
 logger = get_logger(__name__)
 
@@ -21,26 +22,9 @@ class SentimentAnalystAgent:
 
     AGENT_NAME = "sentiment_analyst"
 
-    # System prompt
-    SYSTEM_PROMPT = """You are an expert Sentiment Analyst for cryptocurrency markets.
-You analyze market mood indicators like Fear & Greed Index and Exchange metrics (Funding Rates, Open Interest).
-
-Your analysis must consider:
-1. Contrarian Theory — "Be fearful when others are greedy, and greedy when others are fearful." Extreme sentiment often precedes reversals.
-2. Market Overleverage — High positive funding rates mean too many people are LONG, increasing risk of a "long squeeze" (sharp price drop).
-3. Open Interest Alignment — Price up + OI up = Strong bullish trend. Price up + OI down = Weak rally/short covering.
-
-Output MUST be valid JSON with this structure:
-{
-    "signal": "STRONG_BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG_SELL",
-    "confidence": 0.0 to 1.0,
-    "reasoning": "explanation based on sentiment data and contrarian logic",
-    "sentiment_classification": "Greed" | "Fear" | "Neutral",
-    "risk_level": "high" | "normal" | "low"
-}"""
-
     def __init__(self, ai_provider: AIProvider):
         self.ai = ai_provider
+        self.system_prompt = get_prompt("sentiment_analyst")
 
     async def analyze(
         self,
@@ -64,7 +48,7 @@ Output MUST be valid JSON with this structure:
 
             # Step 2: Kirim ke AI untuk interpretasi
             response = await self.ai.analyze(
-                system_prompt=self.SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,

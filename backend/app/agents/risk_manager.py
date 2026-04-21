@@ -12,6 +12,7 @@ from datetime import datetime
 from app.core.ai_provider import AIProvider
 from app.core.logging import get_logger
 from app.schemas.portfolio import PortfolioState, RiskDecision
+from app.utils.prompts import get_prompt
 
 logger = get_logger(__name__)
 
@@ -27,31 +28,9 @@ class RiskManagerAgent:
     DAILY_LOSS_LIMIT_PCT = -0.03  # Maks rugi 3% per hari
     MAX_DRAWDOWN_LIMIT_PCT = -0.15 # Maks drawdown 15%
 
-    # System prompt
-    SYSTEM_PROMPT = """You are an expert Risk Manager for a cryptocurrency trading bot. 
-Your job is to be the "police" and evaluate if a trade proposal is safe.
-
-You must follow these logical steps:
-1. Account Health — If the portfolio is in deep drawdown or daily loss limit, REJECT all trades.
-2. Position Sizing — Ensure the position doesn't exceed 5% of total capital.
-3. Correlation — Check if the new trade correlates too much with existing positions (e.g., adding another LONG on ETH while already having BTC LONG).
-4. Market Volatility — If volatility is extreme (ATR very high), recommend REDUCE_SIZE or REJECT.
-
-Output MUST be valid JSON:
-{
-    "decision": "APPROVE" | "REJECT" | "REDUCE_SIZE",
-    "max_position_size_usd": float,
-    "max_leverage": int,
-    "reasoning": "Detailed explanation of the risk decision",
-    "risk_metrics": {
-        "current_exposure_pct": float,
-        "new_position_impact_pct": float,
-        "is_within_limits": true/false
-    }
-}"""
-
     def __init__(self, ai_provider: AIProvider):
         self.ai = ai_provider
+        self.system_prompt = get_prompt("risk_manager")
 
     def evaluate_hard_rules(self, portfolio: PortfolioState, trade_size_usd: float) -> Optional[RiskDecision]:
         """
@@ -137,7 +116,7 @@ Output MUST be valid JSON:
             )
 
             response = await self.ai.analyze(
-                system_prompt=self.SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,

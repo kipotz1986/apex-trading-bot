@@ -408,9 +408,9 @@ Memastikan semua agent mengeluarkan output dalam format yang **persis sama** (`A
 4. Tambahkan field `timestamp` untuk tracking kapan sinyal dihasilkan
 
 ### Definition of Done
-- [ ] `AgentSignal` schema final dan digunakan semua agent
-- [ ] Tidak ada agent yang return format berbeda
-- [ ] Error di agent menghasilkan NEUTRAL signal (bukan crash)
+- [x] `AgentSignal` schema final dan digunakan semua agent
+- [x] Tidak ada agent yang return format berbeda
+- [x] Error di agent menghasilkan NEUTRAL signal (bukan crash)
 
 ### File yang Dibuat
 - `[NEW]` `backend/app/schemas/agent_signal.py`

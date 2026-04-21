@@ -5,9 +5,10 @@ Mengelola perpindahan antara Paper Trading dan Live Trading
 dengan aturan pengamanan yang ketat.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from app.models.risk_state import RiskState
 from app.models.order import Order
 from app.core.logging import get_logger
@@ -33,7 +34,7 @@ class ModeSwitcher:
             return False, "Sistem belum terinisialisasi."
 
         # 1. Check Duration
-        duration = datetime.utcnow() - state.paper_trading_started_at
+        duration = datetime.now(timezone.utc).replace(tzinfo=None) - state.paper_trading_started_at
         if duration.days < self.MANDATORY_PAPER_DAYS:
             remaining = self.MANDATORY_PAPER_DAYS - duration.days
             return False, f"Paper trading harus berjalan minimal 14 hari. Sisa: {remaining} hari."
@@ -69,7 +70,8 @@ class ModeSwitcher:
 
         state = self.db.query(RiskState).first()
         state.is_live_enabled = True
-        state.metadata_json["live_enabled_at"] = datetime.utcnow().isoformat()
+        state.metadata_json["live_enabled_at"] = datetime.now(timezone.utc).isoformat()
+        flag_modified(state, "metadata_json")
         
         self.db.commit()
         logger.info("switched_to_live_mode")

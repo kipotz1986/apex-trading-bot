@@ -403,36 +403,44 @@ class MarketStreamService:
 
 ---
 
-## T-3.4: Service Pengambilan Data On-Chain
+## T-3.4: Service Pengambilan Data On-Chain (Free Providers)
 
 **Labels:** `epic-3`, `market-data`, `fundamental`, `priority-medium`
 **Milestone:** Fase 1 — Foundation
 
 ### Deskripsi
-Mengambil data blockchain (on-chain) yang relevan untuk analisa fundamental. Data ini termasuk: pergerakan whale (pemilik aset besar), aliran dana masuk/keluar exchange, dan metrik jaringan.
+Mengambil data blockchain (on-chain) yang relevan untuk analisa fundamental menggunakan **API gratis**. Data ini termasuk: global market metrics, BTC network stats, ETH large transfers, dan gas price.
 
-### Apa itu Data On-Chain?
-Data yang tercatat langsung di blockchain. Contoh penting:
-- **Whale Alert:** Jika dompet besar mengirim 1000 BTC ke exchange → kemungkinan akan dijual → sinyal bearish
-- **Exchange Inflow:** Banyak BTC masuk ke exchange → orang-orang mau jual → bearish
-- **Exchange Outflow:** Banyak BTC keluar dari exchange → orang-orang hold → bullish
+### Provider yang Digunakan (Gratis)
+| Provider | Data | API Key? |
+|---|---|---|
+| **CoinGecko** (https://coingecko.com) | Global market cap, volume, BTC dominance, trending coins | Opsional (meningkatkan rate limit) |
+| **Blockchain.com** (https://blockchain.info) | BTC hashrate, mempool, difficulty, unconfirmed tx | ❌ Tidak perlu |
+| **Etherscan** (https://etherscan.io) | ETH large transfers, gas price tracker | ✅ Free tier (5 req/detik) |
+
+### ~~Provider Lama (Berbayar — Tidak Digunakan)~~
+- ~~Glassnode~~ — Memerlukan langganan berbayar
+- ~~WhaleAlert~~ — Free tier sangat terbatas
+- ~~CryptoQuant~~ — Memerlukan langganan berbayar
 
 ### Langkah-Langkah
 1. Buat `backend/app/services/onchain_data.py`
-2. Integrasi API pihak ketiga:
-   - **Glassnode** (https://glassnode.com) — on-chain metrics
-   - **WhaleAlert** (https://whale-alert.io) — monitoring whale transactions
-   - **CryptoQuant** (https://cryptoquant.com) — exchange flow data
-3. Minimal ambil data: exchange inflow/outflow dan whale movement
+2. Integrasi API gratis:
+   - **CoinGecko** — global market metrics, trending coins
+   - **Blockchain.com** — BTC on-chain stats (tanpa API key)
+   - **Etherscan** — ETH whale tracking, gas price (free tier)
+3. Ambil data: global market cap, BTC hashrate/mempool, ETH large transfers
 4. Sediakan fallback jika salah satu API tidak tersedia
 
 ### Definition of Done
-- [ ] Data on-chain bisa diambil dari minimal 1 provider
-- [ ] Format data dinormalisasi ke format internal
-- [ ] Error handling jika API down
+- [x] Data on-chain bisa diambil dari minimal 1 provider gratis
+- [x] Format data dinormalisasi ke format internal (NormalizedSentiment)
+- [x] Error handling jika API down
+- [x] Tidak ada dependensi pada API berbayar
 
 ### File yang Dibuat
 - `[NEW]` `backend/app/services/onchain_data.py`
+
 
 ---
 

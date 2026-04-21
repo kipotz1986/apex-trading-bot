@@ -164,7 +164,7 @@ Keputusan trading **bukan** dari satu agen tunggal. Mekanisme:
 
 ### 6.1 Analisa Pasar Komprehensif
 - **Teknikal Multi-Timeframe:** RSI, MACD, Bollinger Bands, EMA (9, 21, 50, 200), Fibonacci Retracement, Volume Profile, Ichimoku Cloud, ATR.
-- **Fundamental:** Berita kripto real-time (CoinDesk, CoinTelegraph), data on-chain (whale movement, exchange inflow/outflow), kalender ekonomi makro.
+- **Fundamental:** Berita kripto real-time (CoinDesk, CoinTelegraph via CryptoPanic), data on-chain gratis (BTC stats via Blockchain.com, ETH whale tracking via Etherscan, global market metrics via CoinGecko), kalender ekonomi makro.
 - **Sentimen:** Fear & Greed Index, Funding Rate, Open Interest, social media buzz score.
 
 ### 6.2 Top Trader Copy-Trading Engine
@@ -464,7 +464,7 @@ Sebelum setiap eksekusi, checklist otomatis:
 - [ ] **T-3.1:** Integrasi CCXT library untuk koneksi ke Bybit, Binance, OKX
 - [ ] **T-3.2:** Service pengambilan data candlestick historis (multi-timeframe: 15m, 1H, 4H, 1D)
 - [ ] **T-3.3:** WebSocket stream untuk data harga real-time (ticker, orderbook depth)
-- [ ] **T-3.4:** Service pengambilan data on-chain (whale alerts, exchange flow) via API pihak ketiga
+- [ ] **T-3.4:** Service pengambilan data on-chain gratis (CoinGecko global metrics, Blockchain.com BTC stats, Etherscan ETH whale tracking)
 - [ ] **T-3.5:** Service pengambilan berita kripto (RSS feed + news API)
 - [ ] **T-3.6:** Service pengambilan sentimen (Fear & Greed Index, Funding Rate, Open Interest)
 - [ ] **T-3.7:** Penyimpanan data time-series ke TimescaleDB dengan retention policy

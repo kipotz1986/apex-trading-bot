@@ -284,7 +284,7 @@ Membuat agent yang menganalisa faktor fundamental — berita, data on-chain, dan
 
 ### Input yang Diterima Agent
 1. **Berita terbaru** (dari T-3.5) — apakah ada berita major? regulasi? hack?
-2. **Data on-chain** (dari T-3.4) — whale movement, exchange flow
+2. **Data on-chain** (dari T-3.4) — BTC network stats (Blockchain.com), ETH large transfers (Etherscan), global market metrics (CoinGecko)
 3. **Event kalender** — FOMC meeting, Bitcoin halving, major token unlock
 
 ### Langkah-Langkah

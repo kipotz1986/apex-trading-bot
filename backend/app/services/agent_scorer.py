@@ -37,40 +37,52 @@ class AgentScorer:
 
     def update_performance(self, trade_result: Dict[str, Any]):
         """
-        Update skor berdasarkan hasil trade yang baru ditutup.
+        Update skor menggunakan EMA (Exponential Moving Average).
+        Recency bias: Performa terbaru lebih berbobot.
         
         trade_result: {
             "pnl_pct": float,
-            "agent_signals": { "technical": "BUY", ... }
+            "agent_signals": { "technical": "BUY", ... },
+            "is_neutral_win": bool # Jika market flat dan agent bilang NEUTRAL -> Reward
         }
         """
         pnl = trade_result.get("pnl_pct", 0.0)
-        is_win = pnl > 0
+        alpha = 0.2  # EMA factor (0.2 means 20% weight to newest trade)
         
         scores = self.db.query(AgentScore).all()
         for s in scores:
-            signal = trade_result["agent_signals"].get(s.agent_name)
-            if not signal:
+            signal_obj = trade_result["agent_signals"].get(s.agent_name)
+            if not signal_obj:
                 continue
-                
-            # Logic update skor sederhana
-            # Jika sinyal searah dengan hasil trade, skor naik
-            direction_match = (is_win and "BUY" in signal) or (not is_win and "SELL" in signal)
             
-            if direction_match:
-                s.score += 5.0 # Reward
-                s.successful_trades += 1
-            else:
-                s.score -= 3.0 # Penalty (asymmetric reward/penalty)
+            # Mendukung string atau object AgentSignal
+            signal = signal_obj.signal if hasattr(signal_obj, "signal") else str(signal_obj)
                 
+            # 1. Tentukan per-trade score (R)
+            # R = +100 (Correct), -100 (Wrong), +10 (Neutral in flat market)
+            r = 0.0
+            
+            if pnl > 0.5: # Winning Trade
+                r = 100.0 if "BUY" in signal or "LONG" in signal else -100.0
+            elif pnl < -0.5: # Losing Trade
+                r = 100.0 if "SELL" in signal or "SHORT" in signal else -100.0
+            else: # Flat Market (|pnl| <= 0.5%)
+                r = 20.0 if "NEUTRAL" in signal else -10.0
+
+            # 2. Update EMA Score: S_new = (1-alpha)*S_old + alpha*R
+            s.score = (1 - alpha) * s.score + alpha * r
+            
+            # 3. Stats update
+            if r > 0: s.successful_trades += 1
             s.total_trades += 1
-            # Ensure score doesn't go below 10 (floor)
-            s.score = max(s.score, 10.0)
+            
+            # Stability floor/ceiling
+            s.score = max(min(s.score, 500.0), -500.0)
             
         # Re-calculate weights using Softmax
         self._rebalance_weights()
         self.db.commit()
-        logger.info("agent_weights_updated")
+        logger.info("agent_weights_ema_updated", scores={s.agent_name: round(s.score, 2) for s in scores})
 
     def _initialize_default_scores(self):
         """Buat entri awal untuk semua agen."""

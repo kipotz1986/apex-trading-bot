@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.risk_state import RiskState
 from app.models.order import Order
+from app.services.telegram import TelegramService
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -17,8 +18,9 @@ logger = get_logger(__name__)
 class CircuitBreaker:
     """Service untuk manajemen stop harian, mingguan, dan drawdown."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, telegram: TelegramService = None):
         self.db = db
+        self.telegram = telegram or TelegramService()
 
     async def check_all(self, current_equity: float) -> Tuple[bool, str]:
         """
@@ -39,6 +41,10 @@ class CircuitBreaker:
         if drawdown_pct >= 15.0:
             state.system_status = "EMERGENCY_STOP"
             self.db.commit()
+            
+            # Notify Telegram
+            self._send_instant_alert("EMERGENCY_STOP", f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: 15%)")
+            
             return True, f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: 15%)"
 
         # 2. Daily Loss Limit (3%)
@@ -91,3 +97,13 @@ class CircuitBreaker:
             Order.closed_at >= since
         ).scalar() or 0.0
         return float(total_pnl)
+
+    def _send_instant_alert(self, level: str, reason: str):
+        """Helper untuk kirim alert tanpa blocking."""
+        if self.telegram:
+            import asyncio
+            asyncio.create_task(self.telegram.send_alert(
+                level="critical" if level in ["EMERGENCY_STOP", "REQUIRES_REVIEW"] else "warning",
+                title=f"CIRCUIT BREAKER: {level}",
+                body=f"Alasan: {reason}\nSistem telah dibatasi demi keamanan modal."
+            ))

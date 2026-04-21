@@ -6,6 +6,7 @@ dan mendeteksi perubahan status di exchange.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from app.services.exchange import ExchangeService
@@ -53,8 +54,7 @@ class PositionMonitor:
                 # Posisi sudah tidak ada di exchange -> Berarti sudah ditutup (SL/TP hit atau manual)
                 logger.info("position_closed_detected", symbol=order.symbol)
                 order.status = "CLOSED"
-                import datetime
-                order.closed_at = datetime.datetime.utcnow()
+                order.closed_at = datetime.now(timezone.utc)
                 # Kita bisa mencoba fetch trades terakhir untuk PnL absolut jika perlu
         
         self.db.commit()

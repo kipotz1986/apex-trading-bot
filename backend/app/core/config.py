@@ -44,7 +44,12 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = ""
 
     # === Auth ===
-    JWT_SECRET: str = ""
+    JWT_SECRET: str = "super_secret_fallback_key_change_me"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+    TOTP_SECRET: str = "" # Set in .env
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD_HASH: str = "" # Set in .env
     NEXTAUTH_SECRET: str = ""
     NEXTAUTH_URL: str = "http://localhost:3000"
 

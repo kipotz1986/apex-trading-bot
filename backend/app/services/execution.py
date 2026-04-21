@@ -12,6 +12,7 @@ from app.services.exchange import ExchangeService
 from app.models.order import Order
 from app.models.risk_state import RiskState
 from app.services.paper_trading import PaperTradingEngine
+from app.services.telegram import TelegramService
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,10 +21,11 @@ logger = get_logger(__name__)
 class ExecutionEngine:
     """Engine untuk eksekusi order kripto via CCXT."""
 
-    def __init__(self, exchange: ExchangeService, db: Session, paper_engine: PaperTradingEngine):
+    def __init__(self, exchange: ExchangeService, db: Session, paper_engine: PaperTradingEngine, telegram: TelegramService = None):
         self.exchange = exchange
         self.db = db
         self.paper = paper_engine
+        self.telegram = telegram or TelegramService()
 
     async def open_position(
         self,
@@ -105,6 +107,14 @@ class ExecutionEngine:
             
             if take_profits:
                 await self._set_take_profits(symbol, side, amount, take_profits)
+
+            # Notify Telegram
+            if self.telegram:
+                asyncio.create_task(self.telegram.send_alert(
+                    level="info",
+                    title="POSITION OPENED",
+                    body=f"Symbol: {symbol}\nSide: {side}\nPrice: ${db_order.average_filled_price:,.2f}\nAmount: {amount}\nSL: {stop_loss}"
+                ))
 
             return db_order
 

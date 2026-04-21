@@ -31,7 +31,7 @@ app.add_middleware(
 )
 
 # Routes
-app.include_router(health.router, tags=["System"])
+app.include_router(health.router, prefix="/api", tags=["System"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
 app.include_router(trades.router, prefix="/api/trades", tags=["Trade History"])

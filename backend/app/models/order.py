@@ -4,7 +4,7 @@ Order Model.
 Menyimpan lifecycle order dan status eksekusi di exchange.
 """
 
-from sqlalchemy import Column, String, Float, DateTime, Integer, JSON, ForeignKey
+from sqlalchemy import Column, String, Float, DateTime, Integer, JSON, ForeignKey, Boolean
 from datetime import datetime
 from app.core.database import Base
 
@@ -39,6 +39,10 @@ class Order(Base):
     # Results
     pnl_usd = Column(Float, default=0.0)
     fee_usd = Column(Float, default=0.0)
+
+    # Paper vs Live
+    is_paper = Column(Boolean, default=True)
+    is_testnet = Column(Boolean, default=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

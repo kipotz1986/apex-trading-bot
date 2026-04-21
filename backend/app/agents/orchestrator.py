@@ -76,6 +76,15 @@ class MasterOrchestrator:
         Alur utama pengambilan keputusan.
         """
         try:
+            # 0. Global Circuit Breaker Check (Emergency Stop)
+            is_triggered, cb_reason = await self.validator.circuit_breaker.check_all(portfolio.total_equity)
+            if is_triggered and "Bot is stopped" in cb_reason:
+                logger.warning("orchestrator_blocked_by_circuit_breaker", reason=cb_reason)
+                return TradeDecision(
+                    symbol=symbol, action="HOLD", confidence=0.0, consensus_score=0.0,
+                    reasoning=f"SYSTEM BLOCKED: {cb_reason}", agent_signals={}, market_regime="unknown"
+                )
+
             # 0. Detect Market Regime
             regime_data = self.regime_detector.detect(market_data.get("candles", []))
             

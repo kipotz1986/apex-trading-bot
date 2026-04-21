@@ -1,13 +1,9 @@
-"""
-Pre-Trade Validator.
-
-Gerbang terakhir verifikasi sebelum order dikirim ke exchange.
-Memastikan semua aturan risiko dan sistem dipenuhi.
-"""
-
 from typing import Dict, Any, Tuple
+from sqlalchemy.orm import Session
 from app.schemas.trade_decision import TradeDecision
 from app.schemas.portfolio import PortfolioState
+from app.services.risk.circuit_breaker import CircuitBreaker
+from app.services.risk.risk_guard import RiskGuard
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,8 +12,10 @@ logger = get_logger(__name__)
 class PreTradeValidator:
     """Service untuk validasi ketat sebelum eksekusi trade."""
 
-    def __init__(self, settings: Any = None):
-        self.settings = settings
+    def __init__(self, db: Session):
+        self.db = db
+        self.circuit_breaker = CircuitBreaker(db)
+        self.risk_guard = RiskGuard(db)
 
     async def validate(
         self, 
@@ -30,29 +28,39 @@ class PreTradeValidator:
         Return: (is_valid, reason)
         """
         try:
-            # 1. Check Action
+            # 1. Global Circuit Breaker Check
+            is_triggered, cb_reason = await self.circuit_breaker.check_all(portfolio.total_equity)
+            if is_triggered:
+                return False, f"CIRCUIT BREAKER: {cb_reason}"
+
+            # 2. Level Action Check
             if decision.action == "HOLD":
                 return False, "Action is HOLD, no execution needed."
 
-            # 2. Check Sufficient Balance
-            estimated_cost = decision.position_size_usd
-            if estimated_cost > portfolio.available_margin:
-                return False, f"Insufficient margin. Required: ${estimated_cost}, Available: ${portfolio.available_margin}"
+            # 3. Position Sizing & Exposure Rules
+            safe_size = await self.risk_guard.calculate_safe_size(
+                decision.position_size_usd, portfolio.total_equity
+            )
+            if safe_size < 10.0: # Minimum $10 trade
+                return False, f"Calculated safe size too small: ${safe_size}"
+            
+            # Update decision size to safe size
+            decision.position_size_usd = safe_size
 
-            # 3. Check Confidence Threshold (Safe Guard)
+            # 4. Correlation Guard
+            side = "BUY" if "LONG" in decision.action else "SELL"
+            if not self.risk_guard.validate_correlation(decision.symbol, side):
+                return False, f"REJECTED BY CORRELATION GUARD for {decision.symbol}"
+
+            # 5. Check Sufficient Balance (Margin)
+            if decision.position_size_usd > portfolio.available_margin:
+                return False, f"Insufficient margin. Required: ${decision.position_size_usd}, Available: ${portfolio.available_margin}"
+
+            # 6. Check Confidence Threshold (Safe Guard)
             if decision.confidence < 0.4:
                 return False, f"Confidence too low for execution: {decision.confidence}"
 
-            # 4. Check Daily Loss Limit
-            if portfolio.daily_pnl_pct <= -5.0:  # Hardcoded max 5% daily loss
-                return False, f"Daily loss limit reached: {portfolio.daily_pnl_pct}%"
-
-            # 5. Check Minimum Order Size (Exchange specific, but we check USD value)
-            if estimated_cost < 10.0:  # Default min $10
-                return False, f"Order size too small: ${estimated_cost}"
-
-            # 6. Check Spread (Anti-slippage)
-            # (Misal: market_price vs price di decision jika limit)
+            # 7. Check Spread (Anti-slippage)
             if decision.requested_price:
                 slippage = abs(decision.requested_price - market_price) / market_price
                 if slippage > 0.02: # 2% max slippage guard

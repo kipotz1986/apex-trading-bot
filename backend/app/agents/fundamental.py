@@ -12,6 +12,7 @@ from app.core.ai_provider import AIProvider
 from app.core.logging import get_logger
 from app.schemas.agent_signal import AgentSignal
 from app.schemas.market_data import NormalizedNews, NormalizedSentiment
+from app.utils.prompts import get_prompt
 
 logger = get_logger(__name__)
 
@@ -21,31 +22,9 @@ class FundamentalAnalystAgent:
 
     AGENT_NAME = "fundamental_analyst"
 
-    # System prompt
-    SYSTEM_PROMPT = """You are an expert Fundamental Analyst for cryptocurrency markets.
-You analyze news feeds, on-chain metrics, and macro events to produce trading signals.
-
-Your analysis must be:
-1. Context-aware — evaluate news impact based on source and importance.
-2. Fact-driven — on-chain data (wholesale moves, network stats) reveals real market behavior.
-3. Logical — explain how specific news or on-chain metrics lead to your conclusion.
-4. Objective — differentiate between noise and significant market-moving events.
-
-Output MUST be valid JSON with this structure:
-{
-    "signal": "STRONG_BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG_SELL",
-    "confidence": 0.0 to 1.0,
-    "reasoning": "explanation in 2-3 sentences based on news and on-chain data",
-    "key_factors": [
-        "factor 1 (e.g. BTC ETF inflow)",
-        "factor 2 (e.g. Regulatory news)"
-    ],
-    "onchain_impact": "bullish" | "bearish" | "neutral",
-    "news_impact": "bullish" | "bearish" | "neutral"
-}"""
-
     def __init__(self, ai_provider: AIProvider):
         self.ai = ai_provider
+        self.system_prompt = get_prompt("fundamental_analyst")
 
     async def analyze(
         self,
@@ -81,7 +60,7 @@ Output MUST be valid JSON with this structure:
 
             # Step 2: Kirim ke AI untuk interpretasi
             response = await self.ai.analyze(
-                system_prompt=self.SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,

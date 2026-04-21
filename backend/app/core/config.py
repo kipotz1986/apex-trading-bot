@@ -31,7 +31,6 @@ class Settings(BaseSettings):
     # === On-Chain Data (Free Providers) ===
     COINGECKO_API_KEY: str = ""  # Opsional, meningkatkan rate limit
     ETHERSCAN_API_KEY: str = ""  # Free tier: 5 req/detik, daftar di etherscan.io
-    CRYPTOPANIC_API_KEY: str = ""
 
     # === Database ===
     DATABASE_URL: str = "postgresql://apex:apex_dev_password@localhost:5432/apex_trading"

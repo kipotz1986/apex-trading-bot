@@ -69,10 +69,18 @@ Copy hasilnya ke `ENCRYPTION_KEY` di `.env`.
 ## Langkah 2: Build & Start Services
 
 Jalankan seluruh stack aplikasi menggunakan Docker Compose:
+
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+### Langkah 2.5: Jalankan Migrasi Database
+Setelah container running, jalankan migrasi untuk membuat tabel:
+```bash
+docker compose -f docker-compose.prod.yml exec apex-backend alembic upgrade head
+```
+
+---
 Perintah ini akan secara otomatis:
 - Membangun image Backend & Frontend.
 - Menjalankan Database, Redis, dan ChromaDB.

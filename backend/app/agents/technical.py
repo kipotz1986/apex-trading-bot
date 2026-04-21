@@ -6,7 +6,12 @@ sinyal trading (BUY/SELL/HOLD) dengan confidence score.
 """
 
 import pandas as pd
-import pandas_ta as ta
+try:
+    import pandas_ta as ta
+    HAS_PANDAS_TA = True
+except ImportError:
+    ta = None
+    HAS_PANDAS_TA = False
 import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -61,6 +66,10 @@ Output MUST be valid JSON with this structure:
         """
         Hitung semua indikator teknikal dari data candlestick.
         """
+        if not HAS_PANDAS_TA:
+            logger.warning("calculate_indicators_skipped", reason="pandas-ta not installed")
+            return {}
+
         if df.empty or len(df) < 50: # Perlu minimal data untuk EMA200 dll
             return {}
 

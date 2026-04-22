@@ -14,6 +14,7 @@ import ccxt.async_support as ccxt
 from app.core.config import settings
 from app.core.logging import get_logger
 from typing import Optional
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -64,6 +65,7 @@ class ExchangeService:
 
         return exchange
 
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_ticker")
     async def get_ticker(self, symbol: str) -> dict:
         """
         Ambil harga terkini suatu pair.
@@ -82,6 +84,7 @@ class ExchangeService:
             logger.error("ticker_fetch_error", symbol=symbol, error=str(e))
             raise
 
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_balance")
     async def get_balance(self) -> dict:
         """Ambil saldo akun."""
         try:

@@ -44,5 +44,34 @@ def init_timescale_db():
         except Exception as e:
             logger.warning("retention_policy_failed", error=str(e))
 
+        # 5. Integration Logs Hypertable & Retention (30 days)
+        try:
+            conn.execute(text("SELECT create_hypertable('integration_logs', 'timestamp', if_not_exists => TRUE);"))
+            conn.execute(text("SELECT add_retention_policy('integration_logs', INTERVAL '30 days', if_not_exists => TRUE);"))
+            conn.commit()
+            logger.info("integration_logs_retention_policy_added")
+        except Exception as e:
+            logger.warning("integration_logs_retention_failed", error=str(e))
+
+        # 5. Initialize RiskState if missing
+        from app.models.risk_state import RiskState
+        from sqlalchemy.orm import Session
+        db = Session(bind=engine)
+        try:
+            state = db.query(RiskState).first()
+            if not state:
+                state = RiskState(
+                    current_equity=0.0,
+                    system_status="NORMAL",
+                    is_live_enabled=False
+                )
+                db.add(state)
+                db.commit()
+                logger.info("risk_state_initialized")
+        except Exception as e:
+            logger.error("risk_state_init_failed", error=str(e))
+        finally:
+            db.close()
+
 if __name__ == "__main__":
     init_timescale_db()

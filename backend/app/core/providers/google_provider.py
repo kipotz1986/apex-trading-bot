@@ -7,6 +7,7 @@ Mengimplementasikan AIProvider interface untuk Google Gemini API.
 import google.generativeai as genai
 from app.core.ai_provider import AIProvider, AIResponse, ChatMessage
 from app.core.logging import get_logger
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -20,6 +21,7 @@ class GoogleProvider(AIProvider):
         self.client = genai.GenerativeModel(model)
         logger.info("google_provider_initialized", model=model)
 
+    @log_integration(service_type="AI_PROVIDER", provider_name="GOOGLE", endpoint="chat")
     async def chat(
         self,
         messages: list[ChatMessage],
@@ -101,6 +103,7 @@ class GoogleProvider(AIProvider):
             json_mode=json_mode,
         )
 
+    @log_integration(service_type="AI_PROVIDER", provider_name="GOOGLE", endpoint="embed")
     async def embed(self, text: str) -> list[float]:
         """Generate embedding menggunakan Google Generative AI."""
         try:

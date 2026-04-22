@@ -1,39 +1,64 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Zap, ShieldAlert, ShieldCheck, Info } from "lucide-react"
+import { Zap, ShieldAlert, ShieldCheck, Info, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useBotStatus, useToggleBot, useChangeMode } from "@/hooks/useApi"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function BotControl() {
-  const [isRunning, setIsRunning] = useState(true)
-  const [mode, setMode] = useState("paper")
+  const { data: status, isLoading } = useBotStatus()
+  const toggleBot = useToggleBot()
+  const changeMode = useChangeMode()
 
-  const handleToggle = (checked: boolean) => {
-    setIsRunning(checked)
-    toast(checked ? "Bot Activated" : "Bot Deactivated", {
-      description: checked ? "System is now monitoring markets." : "All algorithms paused.",
-      icon: checked ? <Zap className="w-4 h-4 text-emerald-500" /> : <ShieldAlert className="w-4 h-4 text-red-500" />
-    })
+  if (isLoading) {
+    return (
+      <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+        <CardHeader className="border-b border-white/5 px-6 py-4">
+          <Skeleton className="h-4 w-24" />
+        </CardHeader>
+        <CardContent className="p-6 space-y-8">
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
-  const handleModeChange = (newMode: string) => {
-    if (newMode === "live") {
-      // Logic for 14-day check and win rate gate would go here
-      const canGoLive = false // Dummy check
-      if (!canGoLive) {
-        toast.error("Live Mode Locked", {
-          description: "Mandatory 14-day paper trading period not met. Sisa 12 hari lagi."
-        })
-        return
-      }
+  const isRunning = status?.status === "NORMAL"
+  const mode = status?.mode?.toLowerCase() || "paper"
+
+  const handleToggle = async (checked: boolean) => {
+    try {
+      await toggleBot.mutateAsync(checked ? "start" : "stop")
+      toast.success(checked ? "Bot Activated" : "Bot Deactivated", {
+        description: checked ? "System is now monitoring markets." : "All algorithms paused.",
+        icon: checked ? <Zap className="w-4 h-4 text-emerald-500" /> : <ShieldAlert className="w-4 h-4 text-red-500" />
+      })
+    } catch (err: any) {
+      toast.error("Operation Failed", {
+        description: err.response?.data?.detail || "Could not change bot status."
+      })
     }
-    setMode(newMode)
-    toast.success(`Switched to ${newMode.toUpperCase()} mode`)
+  }
+
+  const handleModeChange = async (newMode: string) => {
+    try {
+      await changeMode.mutateAsync(newMode as "live" | "paper")
+      toast.success(`Switched to ${newMode.toUpperCase()} mode`)
+    } catch (err: any) {
+      toast.error("Mode Change Locked", {
+        description: err.response?.data?.detail || "Safety requirements not met."
+      })
+    }
   }
 
   return (
@@ -44,7 +69,8 @@ export function BotControl() {
         </CardTitle>
         <div className={cn(
           "w-2 h-2 rounded-full",
-          isRunning ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : "bg-red-500 shadow-[0_0_10px_#ef4444]"
+          isRunning ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : "bg-red-500 shadow-[0_0_10px_#ef4444]",
+          (toggleBot.isPending || changeMode.isPending) && "animate-pulse"
         )} />
       </CardHeader>
       
@@ -57,11 +83,15 @@ export function BotControl() {
               {isRunning ? "Logic is active" : "System in standby"}
             </p>
           </div>
-          <Switch 
-            checked={isRunning} 
-            onCheckedChange={handleToggle}
-            className="data-[state=checked]:bg-emerald-500"
-          />
+          <div className="flex items-center gap-3">
+            {toggleBot.isPending && <Loader2 className="w-4 h-4 animate-spin text-white/20" />}
+            <Switch 
+              checked={isRunning} 
+              onCheckedChange={handleToggle}
+              disabled={toggleBot.isPending}
+              className="data-[state=checked]:bg-emerald-500"
+            />
+          </div>
         </div>
 
         {/* Mode Selection */}
@@ -70,6 +100,7 @@ export function BotControl() {
           <RadioGroup 
             value={mode} 
             onValueChange={handleModeChange}
+            disabled={changeMode.isPending}
             className="grid grid-cols-2 gap-4"
           >
             <div>

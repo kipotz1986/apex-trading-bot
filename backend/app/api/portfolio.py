@@ -72,3 +72,28 @@ async def get_equity_history(
         }
         for s in snapshots
     ]
+@router.get("/positions")
+async def get_open_positions(
+    db: Session = Depends(deps.get_db),
+    current_user: str = Depends(deps.get_current_user)
+):
+    """
+    Returns all currently open positions (OPEN status).
+    """
+    positions = db.query(Order).filter(Order.status == "OPEN").all()
+    
+    return [
+        {
+            "id": p.id,
+            "symbol": p.symbol,
+            "side": p.side,
+            "size": p.amount, # In USD/Contracts
+            "entry": p.entry_price,
+            "current": p.current_price or p.entry_price,
+            "leverage": p.leverage,
+            "pnl": p.pnl_usd or 0.0,
+            "pnl_percent": ((p.current_price / p.entry_price - 1) * 100 * p.leverage) if p.entry_price and p.current_price else 0.0,
+            "status": "profit" if (p.pnl_usd or 0.0) >= 0 else "loss"
+        }
+        for p in positions
+    ]

@@ -20,8 +20,6 @@ class LoginResponse(BaseModel):
     requires_2fa: bool
     temp_token: str
 
-class Verify2FARequest(BaseModel):
-    totp_code: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -60,35 +58,47 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     log_audit(db, "login_step_1_success", form_data.username, ip_address=request.client.host)
     
     # Return a temporary token for 2FA verification.
-    temp_token = security.create_temp_token(data={"sub": form_data.username, "type": "temp"})
+    temp_token = security.create_temp_token(subject=form_data.username)
     
     return {
         "requires_2fa": True,
         "temp_token": temp_token
     }
 
+class Verify2FARequest(BaseModel):
+    totp_code: str
+    temp_token: str
+
 @router.post("/verify-2fa", response_model=TokenResponse)
 async def verify_2fa(
+    fastapi_request: Request,
     request: Verify2FARequest,
-    # Need to manually validate temp token from header if needed, but for simplicity:
-    current_user: str = Depends(deps.get_current_user) 
+    db: Session = Depends(deps.get_db)
 ):
     """
     Step 2: Verify TOTP code and return the final Access Token.
     """
+    # Verify temp token
+    try:
+        username = security.verify_token(request.temp_token, expected_type="temp_2fa")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired temporary token",
+        )
+
     # Logic for TOTP verification
+    import pyotp
     if settings.TOTP_SECRET:
-        if not security.verify_totp(settings.TOTP_SECRET, request.totp_code):
+        totp = pyotp.TOTP(settings.TOTP_SECRET)
+        if not totp.verify(request.totp_code, valid_window=1):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid 2FA code",
             )
-    else:
-        # If no secret configured (initial setup), we might want to skip or allow a specific code
-        # For security, we should ideally force a secret setup.
-        pass
 
-    access_token = security.create_access_token(data={"sub": current_user})
+    access_token = security.create_access_token(subject=username)
+    log_audit(db, "login_success", username, ip_address=fastapi_request.client.host)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me")

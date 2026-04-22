@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   description: "Next-generation institutional crypto trading bot powered by multi-agent AI.",
 };
 
+import QueryProvider from "@/components/providers/QueryProvider";
+import AuthGuard from "@/components/providers/AuthGuard";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,7 +31,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <QueryProvider>
+          <AuthGuard>
+            {children}
+          </AuthGuard>
+        </QueryProvider>
         <Toaster theme="dark" position="top-right" richColors />
       </body>
     </html>

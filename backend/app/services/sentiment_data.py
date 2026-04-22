@@ -50,21 +50,17 @@ class SentimentDataService:
         """Ambil Funding Rate dan Open Interest dari exchange."""
         try:
             # Funding Rate
-            # Catatan: Tidak semua exchange mendukung fetch_funding_rate di CCXT standar
-            # Untuk futures/swap biasanya ada.
             funding_rate = 0.0
             try:
-                # CCXT unified method
-                fr_data = await self.exchange.exchange.fetch_funding_rate(symbol)
+                fr_data = await self.exchange.get_funding_rate(symbol)
                 funding_rate = fr_data.get("fundingRate", 0.0)
             except Exception:
-                # Fallback to fetch_tickers if funding rate is included there for some exchanges
                 pass
 
             # Open Interest
             open_interest = 0.0
             try:
-                oi_data = await self.exchange.exchange.fetch_open_interest(symbol)
+                oi_data = await self.exchange.get_open_interest(symbol)
                 open_interest = oi_data.get("openInterestAmount", 0.0)
             except Exception:
                 pass

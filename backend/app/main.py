@@ -45,7 +45,11 @@ app.include_router(websocket.router, tags=["Websocket"])
 @app.on_event("startup")
 async def startup_event():
     from app.db.init_timescale import init_timescale_db
+    from app.services.bot_runner import bot_runner
     init_timescale_db()
+    # Start the trading loop in the background
+    await bot_runner.start()
+    
     logger.info("application_startup",
                 env=settings.APP_ENV,
                 log_level=settings.LOG_LEVEL,
@@ -53,7 +57,10 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    from app.services.bot_runner import bot_runner
     logger.info("application_shutdown_initiated")
+    # Stop the trading loop
+    await bot_runner.stop()
     # Clean up any resources
     # Positions are intentionally NOT closed here.
     logger.info("application_shutdown_complete")

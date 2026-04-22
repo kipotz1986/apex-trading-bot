@@ -104,6 +104,9 @@ class ExchangeService:
         """Ambil funding rate terbaru."""
         try:
             return await self.exchange.fetch_funding_rate(symbol)
+        except (ccxt.BadSymbol, ccxt.NotSupported) as e:
+            logger.warning("funding_rate_not_supported", symbol=symbol, error=str(e))
+            return {}
         except Exception as e:
             logger.error("funding_rate_fetch_error", symbol=symbol, error=str(e))
             raise
@@ -113,6 +116,9 @@ class ExchangeService:
         """Ambil open interest terbaru."""
         try:
             return await self.exchange.fetch_open_interest(symbol)
+        except (ccxt.BadSymbol, ccxt.NotSupported) as e:
+            logger.warning("open_interest_not_supported", symbol=symbol, error=str(e))
+            return {}
         except Exception as e:
             logger.error("open_interest_fetch_error", symbol=symbol, error=str(e))
             raise

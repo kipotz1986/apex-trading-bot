@@ -81,7 +81,8 @@ class BotRunner:
 
         # 3. Gather Data for a set of symbols (e.g. BTC/USDT)
         # In a real app, this would be a list of symbols from settings
-        symbols = ["BTC/USDT"] 
+        # Using CCXT unified format for Swap/Perpetual: BASE/QUOTE:SETTLE
+        symbols = ["BTC/USDT:USDT"] 
 
         for symbol in symbols:
             try:

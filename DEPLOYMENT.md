@@ -127,7 +127,7 @@ Backup dilakukan otomatis via script di `docker/backup.sh`. Anda bisa memasangny
 ### Shutdown Aman (Graceful)
 Untuk mematikan bot tanpa merusak state:
 ```bash
-docker compose -f docker-compose.prod.yml stop
+   docker compose -f docker-compose.prod.yml stop
 ```
 *PENTING: Mematikan bot TIDAK akan menutup posisi trading yang sedang terbuka di bursa.*
 

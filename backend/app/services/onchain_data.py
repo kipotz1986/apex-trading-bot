@@ -19,6 +19,7 @@ from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.schemas.market_data import NormalizedSentiment
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -38,6 +39,7 @@ class OnChainDataService:
 
     # ─── CoinGecko: Market Metrics ─────────────────────────────────────
 
+    @log_integration(service_type="DATA_FEED", provider_name="COINGECKO", endpoint="global")
     async def get_global_market(self) -> Dict[str, Any]:
         """
         Ambil global market metrics dari CoinGecko.
@@ -69,6 +71,7 @@ class OnChainDataService:
             logger.error("coingecko_global_failed", error=str(e))
             return {}
 
+    @log_integration(service_type="DATA_FEED", provider_name="COINGECKO", endpoint="trending")
     async def get_trending_coins(self) -> List[Dict[str, Any]]:
         """Ambil daftar coin yang sedang trending dari CoinGecko."""
         url = f"{self.coingecko_url}/search/trending"
@@ -99,6 +102,7 @@ class OnChainDataService:
 
     # ─── Blockchain.com: BTC On-Chain Stats ────────────────────────────
 
+    @log_integration(service_type="DATA_FEED", provider_name="BLOCKCHAIN.COM", endpoint="stats")
     async def get_btc_onchain_stats(self) -> Dict[str, Any]:
         """
         Ambil statistik on-chain BTC dari Blockchain.com (GRATIS, tanpa API key).
@@ -140,6 +144,7 @@ class OnChainDataService:
 
     # ─── Etherscan: ETH Large Transfers ────────────────────────────────
 
+    @log_integration(service_type="DATA_FEED", provider_name="ETHERSCAN", endpoint="large_transfers")
     async def get_eth_large_transfers(self, min_value_eth: float = 100.0) -> List[Dict[str, Any]]:
         """
         Ambil transfer ETH besar terbaru dari Etherscan (free tier).
@@ -205,6 +210,7 @@ class OnChainDataService:
 
     # ─── Etherscan: Gas Tracker ────────────────────────────────────────
 
+    @log_integration(service_type="DATA_FEED", provider_name="ETHERSCAN", endpoint="gas_oracle")
     async def get_eth_gas_price(self) -> Dict[str, Any]:
         """Ambil gas price ETH terkini dari Etherscan."""
         if not self.etherscan_key:

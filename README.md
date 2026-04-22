@@ -40,14 +40,14 @@ AI_API_KEY=sk-xxxx
 ### 2. Google Gemini
 ```ini
 AI_PROVIDER=google
-AI_MODEL=gemini-1.5-pro
+AI_MODEL=gemini-2.0-flash
 AI_API_KEY=YOUR_GEMINI_KEY
 ```
 
 ### 3. Anthropic Claude
 ```ini
 AI_PROVIDER=anthropic
-AI_MODEL=claude-3-5-sonnet-20240620
+AI_MODEL=claude-3-5-sonnet-latest
 AI_API_KEY=YOUR_CLAUDE_KEY
 ```
 
@@ -55,7 +55,7 @@ AI_API_KEY=YOUR_CLAUDE_KEY
 For high reliability, you can configure a secondary provider that will be used automatically if the primary provider fails:
 ```ini
 AI_FALLBACK_PROVIDER=google
-AI_FALLBACK_MODEL=gemini-1.5-pro
+AI_FALLBACK_MODEL=gemini-2.0-flash
 AI_FALLBACK_API_KEY=YOUR_GEMINI_KEY
 ```
 

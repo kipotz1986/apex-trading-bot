@@ -8,6 +8,7 @@ Mendukung model: gpt-4o, gpt-4-turbo, gpt-4.1, gpt-3.5-turbo
 from openai import AsyncOpenAI
 from app.core.ai_provider import AIProvider, AIResponse, ChatMessage
 from app.core.logging import get_logger
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -20,6 +21,7 @@ class OpenAIProvider(AIProvider):
         self.client = AsyncOpenAI(api_key=api_key)
         logger.info("openai_provider_initialized", model=model)
 
+    @log_integration(service_type="AI_PROVIDER", provider_name="OPENAI", endpoint="chat")
     async def chat(
         self,
         messages: list[ChatMessage],
@@ -99,6 +101,7 @@ class OpenAIProvider(AIProvider):
             json_mode=json_mode,
         )
 
+    @log_integration(service_type="AI_PROVIDER", provider_name="OPENAI", endpoint="embed")
     async def embed(self, text: str) -> list[float]:
         """Generate embedding vector menggunakan OpenAI."""
         try:

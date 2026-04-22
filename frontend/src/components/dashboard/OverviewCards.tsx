@@ -6,47 +6,69 @@ import {
   TrendingDown, 
   DollarSign, 
   Activity, 
-  BarChart3,
-  Percent
+  Percent,
+  Loader2
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-
-const stats = [
-  {
-    title: "Total Balance",
-    value: "$10,240.50",
-    change: "+2.5%",
-    trend: "up",
-    icon: DollarSign,
-    color: "emerald"
-  },
-  {
-    title: "Current Equity",
-    value: "$10,180.20",
-    change: "-$60.30",
-    trend: "down",
-    icon: Activity,
-    color: "blue"
-  },
-  {
-    title: "Today's PnL",
-    value: "+$245.00",
-    change: "+1.2%",
-    trend: "up",
-    icon: TrendingUp,
-    color: "emerald"
-  },
-  {
-    title: "Win Rate",
-    value: "64.5%",
-    change: "+2.1%",
-    trend: "up",
-    icon: Percent,
-    color: "emerald"
-  }
-]
+import { usePortfolioSummary } from "@/hooks/useApi"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function OverviewCards() {
+  const { data, isLoading } = usePortfolioSummary();
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="bg-white/5 border-white/5 backdrop-blur-sm">
+            <CardContent className="p-6 space-y-4">
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      title: "Total Balance",
+      value: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data?.balance || 0),
+      change: data?.total_pnl ? `${data.total_pnl > 0 ? '+' : ''}${data.total_pnl.toFixed(2)}` : "0.00",
+      trend: (data?.total_pnl || 0) >= 0 ? "up" : "down",
+      icon: DollarSign,
+      color: "emerald"
+    },
+    {
+      title: "Current Equity",
+      value: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data?.equity || 0),
+      change: data?.unrealized_pnl ? `${data.unrealized_pnl > 0 ? '+' : ''}${data.unrealized_pnl.toFixed(2)}` : "0.00",
+      trend: (data?.unrealized_pnl || 0) >= 0 ? "up" : "down",
+      icon: Activity,
+      color: "blue"
+    },
+    {
+      title: "Today's PnL",
+      value: `${(data?.daily_pnl || 0) >= 0 ? '+' : ''}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data?.daily_pnl || 0)}`,
+      change: "Last 24h",
+      trend: (data?.daily_pnl || 0) >= 0 ? "up" : "down",
+      icon: TrendingUp,
+      color: (data?.daily_pnl || 0) >= 0 ? "emerald" : "red"
+    },
+    {
+      title: "Win Rate",
+      value: `${data?.win_rate || 0}%`,
+      change: `${data?.total_trades || 0} trades`,
+      trend: "up",
+      icon: Percent,
+      color: "emerald"
+    }
+  ]
+
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, i) => (
@@ -69,7 +91,6 @@ export function OverviewCards() {
               </p>
             </div>
             
-            {/* Decoration Sparkline Placeholder */}
             <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
                <div 
                  className={`h-full bg-${stat.color}-500/40 rounded-full transition-all duration-1000`} 

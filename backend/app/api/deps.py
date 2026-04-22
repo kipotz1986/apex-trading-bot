@@ -35,10 +35,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
+        from app.core.security import verify_token
+        username = verify_token(token, expected_type="access")
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception

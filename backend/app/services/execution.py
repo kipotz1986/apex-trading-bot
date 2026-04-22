@@ -6,6 +6,7 @@ Mendukung Bybit (P0), Binance (P1) via CCXT.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.services.exchange import ExchangeService
@@ -129,6 +130,25 @@ class ExecutionEngine:
             close_side = "sell" if side.upper() == "BUY" else "buy"
             logger.info("closing_position", symbol=symbol, side=close_side, amount=amount)
             
+            # Check Global Mode
+            risk_state = self.db.query(RiskState).first()
+            is_live = risk_state.is_live_enabled if risk_state else False
+            
+            if not is_live:
+                logger.info("close_position_paper_mode", symbol=symbol)
+                # Update status di DB untuk paper trade terakhir
+                order = self.db.query(Order).filter(
+                    Order.symbol == symbol,
+                    Order.status == "FILLED",
+                    Order.is_paper == True
+                ).order_by(Order.created_at.desc()).first()
+                
+                if order:
+                    order.status = "CLOSED"
+                    order.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    self.db.commit()
+                return True
+
             # Gunakan market order untuk close (ensure closure)
             res = await self.exchange.exchange.create_market_order(
                 symbol, close_side, amount, params={"reduceOnly": True}

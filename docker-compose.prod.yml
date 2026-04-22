@@ -19,7 +19,7 @@ services:
     networks:
       - apex-network
     healthcheck:
-      test: ["CMD", "python3", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      test: ["CMD", "python3", "-c", "import httpx; httpx.get('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,6 +46,7 @@ services:
     image: caddy:2-alpine
     container_name: apex-caddy
     restart: unless-stopped
+    env_file: .env
     ports:
       - "80:80"
       - "443:443"
@@ -67,6 +68,10 @@ services:
     container_name: apex-postgres
     restart: unless-stopped
     env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-apex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apex_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-apex_trading}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

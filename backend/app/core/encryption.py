@@ -1,33 +1,36 @@
 """
 AES-256 Encryption for sensitive data.
-Using cryptography.fernet for symmetric encryption of API keys.
+
+Mengenkripsi data sensitif (API keys, secrets) sebelum disimpan ke database.
+Dekripsi hanya dilakukan saat data dibutuhkan.
+
+Usage:
+    from app.core.encryption import encrypt, decrypt
+    encrypted = encrypt("my-secret-api-key")   # → "gAAAAABh..."
+    original = decrypt(encrypted)               # → "my-secret-api-key"
 """
 
-import base64
-import hashlib
 from cryptography.fernet import Fernet
 from app.core.config import settings
+import base64
+import hashlib
 
 def _get_key() -> bytes:
-    """Derive encryption key from JWT_SECRET to ensure uniqueness per installation."""
-    # Use SHA-256 to create a 32-byte key from the JWT_SECRET
+    """Derive encryption key dari JWT_SECRET."""
+    # Gunakan JWT_SECRET sebagai basis key
     key = hashlib.sha256(settings.JWT_SECRET.encode()).digest()
     return base64.urlsafe_b64encode(key)
 
 def encrypt(plaintext: str) -> str:
-    """Encrypts a string into a Fernet token."""
+    """Enkripsi string → encrypted string."""
     if not plaintext:
-        return ""
+        return plaintext
     f = Fernet(_get_key())
     return f.encrypt(plaintext.encode()).decode()
 
 def decrypt(ciphertext: str) -> str:
-    """Decrypts a Fernet token back into the original string."""
+    """Dekripsi encrypted string → original string."""
     if not ciphertext:
-        return ""
-    try:
-        f = Fernet(_get_key())
-        return f.decrypt(ciphertext.encode()).decode()
-    except Exception:
-        # If decryption fails (e.g. wrong key), return empty string or handle error
-        return ""
+        return ciphertext
+    f = Fernet(_get_key())
+    return f.decrypt(ciphertext.encode()).decode()

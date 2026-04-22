@@ -5,14 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts"
 
-const agentData = [
-  { name: "Technical", score: 85, weight: "40%", status: "OPTIMIZED" },
-  { name: "Sentiment", score: 62, weight: "25%", status: "STABLE" },
-  { name: "On-Chain", score: 45, weight: "20%", status: "LEARNING" },
-  { name: "Risk Guard", score: 98, weight: "15%", status: "CRITICAL" },
-]
+import { useAgentScores } from "@/hooks/useApi"
+import { AgentScore } from "@/types/api"
+import { cn } from "@/lib/utils"
 
 export function AgentPerformance() {
+  const { data: scores = [], isLoading } = useAgentScores()
+  
+  // Transform API data to chart format
+  const agentData = scores.map(s => ({
+    name: s.agent_name.split('_')[0],
+    score: Math.round(s.accuracy_score * 100),
+    weight: s.total_predictions.toString(),
+    status: s.accuracy_score > 0.8 ? "OPTIMIZED" : "LEARNING"
+  }))
   return (
     <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -72,5 +78,3 @@ export function AgentPerformance() {
     </Card>
   )
 }
-
-import { cn } from "@/lib/utils"

@@ -9,6 +9,7 @@ import {
   Bot, 
   Brain, 
   History, 
+  Activity,
   Settings, 
   Lock,
   Zap
@@ -24,6 +25,7 @@ const menuItems = [
   { icon: Bot, label: "AI Agents", href: "/agents" },
   { icon: Brain, label: "Self-Learning", href: "/learning" },
   { icon: History, label: "Backtest", href: "/backtest" },
+  { icon: Activity, label: "System Logs", href: "/logs" },
 ]
 
 export function Sidebar() {
@@ -94,7 +96,13 @@ export function Sidebar() {
           <Settings className="w-5 h-5 shrink-0" />
           <span className="text-sm font-semibold hidden lg:block">Settings</span>
         </Link>
-        <button className="w-full flex items-center gap-3 px-3 h-12 rounded-xl text-red-500/50 hover:text-red-400 hover:bg-red-500/5 transition-all">
+        <button 
+          onClick={() => {
+            localStorage.removeItem("token");
+            window.location.href = "/login";
+          }}
+          className="w-full flex items-center gap-3 px-3 h-12 rounded-xl text-red-500/50 hover:text-red-400 hover:bg-red-500/5 transition-all"
+        >
           <Lock className="w-5 h-5 shrink-0" />
           <span className="text-sm font-semibold hidden lg:block">Lock Console</span>
         </button>

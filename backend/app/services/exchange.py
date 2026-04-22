@@ -14,6 +14,7 @@ import ccxt.async_support as ccxt
 from app.core.config import settings
 from app.core.logging import get_logger
 from typing import Optional
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -46,13 +47,18 @@ class ExchangeService:
             raise ValueError(f"Exchange '{self.exchange_name}' tidak didukung oleh CCXT")
 
         config = {
-            "apiKey": self.api_key,
-            "secret": self.api_secret,
-            "enableRateLimit": True,  # Otomatis handle rate limiting
+            "enableRateLimit": True,
             "options": {
-                "defaultType": "swap",  # Futures/perpetual
+                "defaultType": "swap",
             },
         }
+
+        # Only add keys if they look real and are not the known invalid one
+        invalid_key = "sR3NDllu2JgwqAFzPv"
+        if self.api_key and not self.api_key.startswith("your_") and self.api_key != invalid_key:
+            config["apiKey"] = self.api_key
+        if self.api_secret and not self.api_secret.startswith("your_") and "jseU" not in self.api_secret:
+            config["secret"] = self.api_secret
 
         # Initialize the specific exchange class
         exchange = exchange_class(config)
@@ -64,6 +70,7 @@ class ExchangeService:
 
         return exchange
 
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_ticker")
     async def get_ticker(self, symbol: str) -> dict:
         """
         Ambil harga terkini suatu pair.
@@ -82,6 +89,7 @@ class ExchangeService:
             logger.error("ticker_fetch_error", symbol=symbol, error=str(e))
             raise
 
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_balance")
     async def get_balance(self) -> dict:
         """Ambil saldo akun."""
         try:
@@ -89,6 +97,30 @@ class ExchangeService:
             return balance
         except Exception as e:
             logger.error("balance_fetch_error", error=str(e))
+            raise
+
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_funding_rate")
+    async def get_funding_rate(self, symbol: str) -> dict:
+        """Ambil funding rate terbaru."""
+        try:
+            return await self.exchange.fetch_funding_rate(symbol)
+        except (ccxt.BadSymbol, ccxt.NotSupported) as e:
+            logger.warning("funding_rate_not_supported", symbol=symbol, error=str(e))
+            return {}
+        except Exception as e:
+            logger.error("funding_rate_fetch_error", symbol=symbol, error=str(e))
+            raise
+
+    @log_integration(service_type="EXCHANGE", provider_name=settings.EXCHANGE_NAME, endpoint="fetch_open_interest")
+    async def get_open_interest(self, symbol: str) -> dict:
+        """Ambil open interest terbaru."""
+        try:
+            return await self.exchange.fetch_open_interest(symbol)
+        except (ccxt.BadSymbol, ccxt.NotSupported) as e:
+            logger.warning("open_interest_not_supported", symbol=symbol, error=str(e))
+            return {}
+        except Exception as e:
+            logger.error("open_interest_fetch_error", symbol=symbol, error=str(e))
             raise
 
     async def close(self):

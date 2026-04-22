@@ -10,42 +10,33 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown } from "lucide-react"
-
-const positions = [
-  {
-    symbol: "BTC/USDT",
-    side: "LONG",
-    size: "$1,250.00",
-    entry: "$64,200.00",
-    current: "$64,520.40",
-    pnl: "+$12.50 (+1.0%)",
-    leverage: "5x",
-    status: "profit"
-  },
-  {
-    symbol: "ETH/USDT",
-    side: "SHORT",
-    size: "$800.00",
-    entry: "$3,450.00",
-    current: "$3,485.50",
-    pnl: "-$8.20 (-0.8%)",
-    leverage: "3x",
-    status: "loss"
-  },
-  {
-    symbol: "SOL/USDT",
-    side: "LONG",
-    size: "$500.00",
-    entry: "$142.50",
-    current: "$145.20",
-    pnl: "+$9.45 (+1.9%)",
-    leverage: "10x",
-    status: "profit"
-  }
-]
+import { TrendingUp, TrendingDown, Loader2 } from "lucide-react"
+import { useOpenPositions } from "@/hooks/useApi"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 export function PositionsTable() {
+  const { data: positions, isLoading } = useOpenPositions();
+
+  if (isLoading) {
+    return (
+      <div className="p-8 space-y-4">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!positions || positions.length === 0) {
+    return (
+      <div className="p-12 text-center space-y-2">
+        <p className="text-sm font-bold text-white/40 uppercase tracking-widest">No Active Positions</p>
+        <p className="text-[10px] text-white/20 font-medium">Bot is currently scanning for entry signals.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       <Table>
@@ -60,8 +51,8 @@ export function PositionsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {positions.map((pos, i) => (
-            <TableRow key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+          {positions.map((pos) => (
+            <TableRow key={pos.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
               <TableCell className="py-5 pl-8">
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-white tracking-tight">{pos.symbol}</span>
@@ -80,17 +71,17 @@ export function PositionsTable() {
               
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-white/80">{pos.size}</span>
+                  <span className="text-xs font-bold text-white/80">${pos.size.toLocaleString()}</span>
                   <Badge variant="outline" className="text-[9px] text-white/30 border-white/5 px-1.5 h-4">
-                    {pos.leverage}
+                    {pos.leverage}x
                   </Badge>
                 </div>
               </TableCell>
               
               <TableCell>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white/80 tracking-tighter">{pos.entry}</span>
-                  <span className="text-[10px] text-white/30 font-medium tracking-tighter">{pos.current}</span>
+                  <span className="text-xs font-bold text-white/80 tracking-tighter">${pos.entry.toLocaleString()}</span>
+                  <span className="text-[10px] text-white/30 font-medium tracking-tighter">${pos.current.toLocaleString()}</span>
                 </div>
               </TableCell>
               
@@ -100,7 +91,7 @@ export function PositionsTable() {
                   pos.status === 'profit' ? "text-emerald-500" : "text-red-500"
                 )}>
                   {pos.status === 'profit' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {pos.pnl}
+                  {pos.pnl >= 0 ? '+' : ''}{pos.pnl.toFixed(2)} ({pos.pnl_percent.toFixed(2)}%)
                 </div>
               </TableCell>
               
@@ -116,6 +107,3 @@ export function PositionsTable() {
     </div>
   )
 }
-
-// Need cn helper
-import { cn } from "@/lib/utils"

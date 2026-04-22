@@ -7,6 +7,7 @@ Mengimplementasikan AIProvider interface untuk Anthropic Claude API.
 from anthropic import AsyncAnthropic
 from app.core.ai_provider import AIProvider, AIResponse, ChatMessage
 from app.core.logging import get_logger
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,7 @@ class AnthropicProvider(AIProvider):
         self.client = AsyncAnthropic(api_key=api_key)
         logger.info("anthropic_provider_initialized", model=model)
 
+    @log_integration(service_type="AI_PROVIDER", provider_name="ANTHROPIC", endpoint="chat")
     async def chat(
         self,
         messages: list[ChatMessage],

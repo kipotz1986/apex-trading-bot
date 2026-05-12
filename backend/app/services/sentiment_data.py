@@ -17,6 +17,7 @@ from typing import Dict, Any, Optional
 from app.services.exchange import ExchangeService
 from app.core.logging import get_logger
 from app.schemas.market_data import NormalizedSentiment
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -28,10 +29,13 @@ class SentimentDataService:
         self.fear_greed_url = "https://api.alternative.me/fng/"
         self.timeout = 10.0
 
+    @log_integration(service_type="DATA_FEED", provider_name="ALTERNATIVE_ME", endpoint="fetch_fng")
     async def get_fear_greed_index(self) -> Dict[str, Any]:
         """Ambil Fear & Greed Index terbaru (0-100)."""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=self.fear_greed_url, method="GET")
                 response = await client.get(self.fear_greed_url)
                 if response.status_code == 200:
                     data = response.json()

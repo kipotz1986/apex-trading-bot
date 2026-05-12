@@ -22,9 +22,17 @@ class FallbackProvider(AIProvider):
         self.fallback = fallback
         self._using_fallback = False
 
-    async def chat(self, messages: list[ChatMessage], temperature: float = 0.7, max_tokens: int = 4096, json_mode: bool = False) -> AIResponse:
+    async def chat(
+        self,
+        messages: list[ChatMessage],
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        json_mode: bool = False,
+        agent_name: Optional[str] = None,
+        advanced: bool = False,
+    ) -> AIResponse:
         try:
-            response = await self.primary.chat(messages, temperature, max_tokens, json_mode)
+            response = await self.primary.chat(messages, temperature, max_tokens, json_mode, agent_name, advanced)
             self._using_fallback = False
             return response
         except Exception as primary_error:
@@ -35,7 +43,7 @@ class FallbackProvider(AIProvider):
                     error=str(primary_error)
                 )
                 self._using_fallback = True
-                return await self.fallback.chat(messages, temperature, max_tokens, json_mode)
+                return await self.fallback.chat(messages, temperature, max_tokens, json_mode, agent_name, advanced)
             
             logger.error("primary_provider_failed_no_fallback",
                 primary=self.primary.__class__.__name__,
@@ -43,9 +51,17 @@ class FallbackProvider(AIProvider):
             )
             raise
 
-    async def analyze(self, system_prompt: str, data: str, instruction: str, json_mode: bool = True) -> AIResponse:
+    async def analyze(
+        self,
+        system_prompt: str,
+        data: str,
+        instruction: str,
+        json_mode: bool = True,
+        agent_name: Optional[str] = None,
+        advanced: bool = False,
+    ) -> AIResponse:
         try:
-            response = await self.primary.analyze(system_prompt, data, instruction, json_mode)
+            response = await self.primary.analyze(system_prompt, data, instruction, json_mode, agent_name, advanced)
             self._using_fallback = False
             return response
         except Exception as primary_error:
@@ -56,7 +72,7 @@ class FallbackProvider(AIProvider):
                     error=str(primary_error)
                 )
                 self._using_fallback = True
-                return await self.fallback.analyze(system_prompt, data, instruction, json_mode)
+                return await self.fallback.analyze(system_prompt, data, instruction, json_mode, agent_name, advanced)
             raise
 
     async def embed(self, text: str) -> list[float]:
@@ -71,6 +87,9 @@ class FallbackProvider(AIProvider):
                 )
                 return await self.fallback.embed(text)
             raise
+
+    async def list_models(self) -> list[str]:
+        return await self.primary.list_models()
 
     async def health_check(self) -> bool:
         """Kesehatan dianggap OK jika primary OK, ATAU fallback OK."""

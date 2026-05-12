@@ -31,13 +31,23 @@ class SentimentAnalystAgent:
         symbol: str,
         composite_sentiment: NormalizedSentiment,
         exchange_sentiment: Dict[str, Any],
+        advanced: bool = False,
     ) -> AgentSignal:
         """
         Analisa sentimen lengkap berdasarkan data agregat dan exchange.
         """
         try:
             # Step 1: Format data untuk AI
-            data_str = f"Symbol: {symbol}\n\nComposite Sentiment Data:\n{composite_sentiment.model_dump()}\n"
+            if composite_sentiment is not None:
+                sentiment_dump = composite_sentiment.model_dump()
+                sentiment_score = composite_sentiment.score
+                sentiment_class = composite_sentiment.classification
+            else:
+                sentiment_dump = {"note": "No composite sentiment data available"}
+                sentiment_score = 0.0
+                sentiment_class = "neutral"
+
+            data_str = f"Symbol: {symbol}\n\nComposite Sentiment Data:\n{sentiment_dump}\n"
             data_str += f"\nExchange Sentiment (Funding & OI):\n{json.dumps(exchange_sentiment, indent=2)}\n"
 
             instruction = (
@@ -52,6 +62,8 @@ class SentimentAnalystAgent:
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,
+                agent_name=self.AGENT_NAME,
+                advanced=advanced,
             )
 
             # Step 3: Parse response AI
@@ -75,9 +87,9 @@ class SentimentAnalystAgent:
                 confidence=result.get("confidence", 0.0),
                 reasoning=result.get("reasoning", "No reasoning provided."),
                 metadata={
-                    "sentiment_classification": result.get("sentiment_classification", composite_sentiment.classification),
+                    "sentiment_classification": result.get("sentiment_classification", sentiment_class),
                     "risk_level": result.get("risk_level", "normal"),
-                    "composite_score": composite_sentiment.score,
+                    "composite_score": sentiment_score,
                     "funding_rate": exchange_sentiment.get("funding_rate", 0.0),
                     "open_interest": exchange_sentiment.get("open_interest", 0.0)
                 },

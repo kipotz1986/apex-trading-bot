@@ -5,6 +5,7 @@ Mengimplementasikan AIProvider interface untuk Google Gemini API.
 """
 
 import google.generativeai as genai
+from typing import Optional
 from app.core.ai_provider import AIProvider, AIResponse, ChatMessage
 from app.core.logging import get_logger
 from app.services.integration_logger import log_integration
@@ -28,6 +29,7 @@ class GoogleProvider(AIProvider):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        agent_name: Optional[str] = None,
     ) -> AIResponse:
         """Kirim percakapan ke Google Gemini."""
         try:
@@ -88,6 +90,7 @@ class GoogleProvider(AIProvider):
         data: str,
         instruction: str,
         json_mode: bool = True,
+        agent_name: Optional[str] = None,
     ) -> AIResponse:
         """Shortcut untuk analisis data."""
         messages = [
@@ -101,6 +104,7 @@ class GoogleProvider(AIProvider):
             messages=messages,
             temperature=0.3,
             json_mode=json_mode,
+            agent_name=agent_name,
         )
 
     @log_integration(service_type="AI_PROVIDER", provider_name="GOOGLE", endpoint="embed")
@@ -116,6 +120,17 @@ class GoogleProvider(AIProvider):
         except Exception as e:
             logger.error("google_embed_error", error=str(e))
             raise
+
+    async def list_models(self) -> list[str]:
+        """Dapatkan daftar model dari Google Gemini."""
+        try:
+            models = []
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    models.append(m.name.replace('models/', ''))
+            return sorted(models)
+        except Exception:
+            return ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
 
     async def health_check(self) -> bool:
         """Cek health status Gemini API."""

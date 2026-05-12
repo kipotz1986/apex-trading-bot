@@ -32,6 +32,7 @@ class FundamentalAnalystAgent:
         news: List[NormalizedNews],
         onchain_summary: NormalizedSentiment,
         onchain_stats: Dict[str, Any] = None,
+        advanced: bool = False,
     ) -> AgentSignal:
         """
         Analisa fundamental lengkap berdasarkan berita dan data on-chain.
@@ -48,7 +49,10 @@ class FundamentalAnalystAgent:
                  })
 
             data_str = f"Symbol: {symbol}\n\nLatest News:\n{json.dumps(news_data, indent=2)}\n"
-            data_str += f"\nOn-Chain Summary:\n{onchain_summary.model_dump()}\n"
+            if onchain_summary:
+                data_str += f"\nOn-Chain Summary:\n{onchain_summary.model_dump()}\n"
+            else:
+                data_str += f"\nOn-Chain Summary: Not available\n"
             if onchain_stats:
                 data_str += f"\nOn-Chain Metrics:\n{json.dumps(onchain_stats, indent=2)}\n"
 
@@ -64,6 +68,8 @@ class FundamentalAnalystAgent:
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,
+                agent_name=self.AGENT_NAME,
+                advanced=advanced,
             )
 
             # Step 3: Parse response AI
@@ -91,7 +97,7 @@ class FundamentalAnalystAgent:
                     "onchain_impact": result.get("onchain_impact", "neutral"),
                     "news_impact": result.get("news_impact", "neutral"),
                     "news_count": len(news),
-                    "onchain_score": onchain_summary.score
+                    "onchain_score": onchain_summary.score if onchain_summary else 0
                 },
             )
 

@@ -7,8 +7,8 @@ import { Clock, Brain, MessageSquare, ChevronRight } from "lucide-react"
 
 import { useAgentDecisions } from "@/hooks/useApi"
 import { AgentDecision } from "@/types/api"
-import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { fmtDateTime } from "@/lib/dateFormat"
 
 export function DecisionLog() {
   const { data: decisions = [], isLoading } = useAgentDecisions(10)
@@ -21,9 +21,6 @@ export function DecisionLog() {
              AI Decision Engine
            </CardTitle>
         </div>
-        <button className="text-[9px] font-black text-emerald-500/50 hover:text-emerald-500 transition-colors uppercase tracking-widest">
-           View Matrix
-        </button>
       </CardHeader>
       
       <CardContent className="p-0">
@@ -42,7 +39,7 @@ export function DecisionLog() {
                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                        <span className="text-[10px] font-mono text-emerald-500/50">
-                         {format(new Date(dec.timestamp), "HH:mm:ss")}
+                         {fmtDateTime(dec.timestamp)}
                        </span>
                        <Badge variant="outline" className="text-[9px] font-black border-white/10 group-hover:border-emerald-500/30 transition-colors">
                           {dec.symbol}
@@ -65,30 +62,33 @@ export function DecisionLog() {
                  </p>
   
                  <div className="flex items-center justify-between">
-                    <div className="flex gap-2">
-                       {/* Transform agent_signals map to displayable items */}
-                       {Object.entries(dec.agent_signals || {}).map(([name, signal]: [string, any], i) => (
-                         <div key={i} className="flex flex-col items-center">
-                            <span className="text-[7px] font-black text-white/20 mb-1">{name.toUpperCase().substring(0, 3)}</span>
-                            <div className={cn(
-                              "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black",
-                              signal === 'BUY' ? "bg-emerald-500/10 text-emerald-500" : signal === 'SELL' ? "bg-red-500/10 text-red-500" : "bg-white/5 text-white/40"
-                            )}>
-                              {signal === 'BUY' ? 'B' : signal === 'SELL' ? 'S' : 'H'}
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-white/10 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
-                 </div>
+                     <div className="flex gap-2">
+                        {/* Transform agent_signals map to displayable items */}
+                        {Object.entries(dec.agent_signals || {}).map(([name, signalObj]: [string, any], i) => {
+                           const sigVal = typeof signalObj === 'string' ? signalObj : (signalObj?.signal || 'HOLD');
+                           const isBuy = sigVal.includes('BUY') || sigVal.includes('LONG');
+                           const isSell = sigVal.includes('SELL') || sigVal.includes('SHORT');
+                           
+                           return (
+                             <div key={i} className="flex flex-col items-center">
+                                <span className="text-[7px] font-black text-white/20 mb-1">{name.toUpperCase().substring(0, 3)}</span>
+                                <div className={cn(
+                                  "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black",
+                                  isBuy ? "bg-emerald-500/10 text-emerald-500" : isSell ? "bg-red-500/10 text-red-500" : "bg-white/5 text-white/40"
+                                )}>
+                                  {isBuy ? 'B' : isSell ? 'S' : 'H'}
+                                </div>
+                             </div>
+                           );
+                        })}
+                     </div>
+                     <ChevronRight className="w-4 h-4 text-white/10 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+                  </div>
               </div>
             ))
           )}
         </div>
         
-        <button className="w-full py-4 bg-white/[0.01] hover:bg-white/[0.03] text-[9px] font-bold text-white/20 hover:text-white transition-all uppercase tracking-[0.2em] border-t border-white/5">
-           Deep Analysis Log →
-        </button>
       </CardContent>
     </Card>
   )

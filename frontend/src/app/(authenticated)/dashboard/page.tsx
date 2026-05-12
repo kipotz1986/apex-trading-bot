@@ -2,10 +2,12 @@
 
 import { OverviewCards } from "@/components/dashboard/OverviewCards"
 import { EquityChart } from "@/components/dashboard/EquityChart"
+import { CandlestickChart } from "@/components/dashboard/CandlestickChart"
 import { PositionsTable } from "@/components/dashboard/PositionsTable"
 import { BotControl } from "@/components/dashboard/BotControl"
+import { ModeBadge } from "@/components/dashboard/ModeBadge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ListFilter, Zap, Loader2 } from "lucide-react"
+import { Zap, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAgentInsights, useOpenPositions } from "@/hooks/useApi"
 import { useQueryClient } from "@tanstack/react-query"
@@ -40,10 +42,8 @@ export default function DashboardPage() {
           <p className="text-white/40 text-sm mt-1">Real-time portfolio metrics and AI trading activity.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-white/5 border-white/5 hover:bg-white/10 text-xs gap-2">
-            <ListFilter className="w-4 h-4" /> Filter Range
-          </Button>
-          <Button 
+          <ModeBadge variant="compact" />
+          <Button
             onClick={handleSync}
             disabled={isSyncing}
             className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
@@ -58,24 +58,30 @@ export default function DashboardPage() {
       <OverviewCards />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Equity Chart */}
-        <Card className="lg:col-span-2 bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-8">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest text-emerald-500/80 decoration-emerald-500/20 decoration-2 underline-offset-8">
-              Equity Curve
-            </CardTitle>
-            <div className="flex gap-1">
-              {['1D', '1W', '1M', 'ALL'].map(t => (
-                <button key={t} className="px-3 py-1 rounded-md text-[10px] font-bold text-white/40 hover:text-white hover:bg-white/5 transition-all">
-                  {t}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <EquityChart />
-          </CardContent>
-        </Card>
+        {/* Left Column: Equity Chart + Candlestick */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-8">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-emerald-500/80 decoration-emerald-500/20 decoration-2 underline-offset-8">
+                Equity Curve
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EquityChart />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-emerald-500/80 decoration-emerald-500/20 decoration-2 underline-offset-8">
+                Market Chart
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CandlestickChart />
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Right Column: Control & Insights */}
         <div className="space-y-6">

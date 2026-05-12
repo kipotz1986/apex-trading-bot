@@ -5,6 +5,7 @@ Mengimplementasikan AIProvider interface untuk Anthropic Claude API.
 """
 
 from anthropic import AsyncAnthropic
+from typing import Optional
 from app.core.ai_provider import AIProvider, AIResponse, ChatMessage
 from app.core.logging import get_logger
 from app.services.integration_logger import log_integration
@@ -27,6 +28,7 @@ class AnthropicProvider(AIProvider):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        agent_name: Optional[str] = None,
     ) -> AIResponse:
         """Kirim percakapan ke Anthropic Claude."""
         try:
@@ -92,6 +94,7 @@ class AnthropicProvider(AIProvider):
         data: str,
         instruction: str,
         json_mode: bool = True,
+        agent_name: Optional[str] = None,
     ) -> AIResponse:
         """Shortcut untuk analisis data menggunakan Claude."""
         messages = [
@@ -105,6 +108,7 @@ class AnthropicProvider(AIProvider):
             messages=messages,
             temperature=0.3,
             json_mode=json_mode,
+            agent_name=agent_name,
         )
 
     async def embed(self, text: str) -> list[float]:
@@ -114,6 +118,19 @@ class AnthropicProvider(AIProvider):
         """
         logger.warning("anthropic_embedding_not_supported")
         raise NotImplementedError("Anthropic does not provide an embedding API yet. Use OpenAI for embeddings.")
+
+    async def list_models(self) -> list[str]:
+        """
+        Dapatkan daftar model dari Anthropic.
+        Anthropic Python SDK saat ini tidak punya method list_models yang stabil.
+        Kita gunakan daftar statis yang terbaru.
+        """
+        return [
+            "claude-3-5-sonnet-20240620",
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307"
+        ]
 
     async def health_check(self) -> bool:
         """Cek health status Anthropic API."""

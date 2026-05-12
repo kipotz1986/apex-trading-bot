@@ -26,11 +26,17 @@ class Settings(BaseSettings):
     EXCHANGE_NAME: str = "bybit"
     EXCHANGE_API_KEY: str = ""
     EXCHANGE_API_SECRET: str = ""
+    EXCHANGE_DEMO_API_KEY: str = ""
+    EXCHANGE_DEMO_API_SECRET: str = ""
     EXCHANGE_TESTNET: bool = True  # True = paper trading (aman)
+
+    # === Encryption ===
+    ENCRYPTION_KEY: str = "" # Used for encrypting exchange credentials
 
     # === On-Chain Data (Free Providers) ===
     COINGECKO_API_KEY: str = ""  # Opsional, meningkatkan rate limit
     ETHERSCAN_API_KEY: str = ""  # Free tier: 5 req/detik, daftar di etherscan.io
+    CRYPTOCOMPARE_API_KEY: str = "" # Required for news filtering
 
     # === Database ===
     DATABASE_URL: str = "postgresql://apex:apex_dev_password@localhost:5432/apex_trading"
@@ -56,6 +62,27 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     TIMEZONE: str = "Asia/Jakarta"
+
+    # === Bot Runner ===
+    # Multi-symbol trading: BTC, ETH, SOL by default. CCXT contract format for Bybit perps.
+    TRADING_SYMBOLS: str = "BTC/USDT:USDT,ETH/USDT:USDT,SOL/USDT:USDT"
+
+    def get_symbol_list(self) -> list[str]:
+        """Parse symbol string into list, with DB override if available."""
+        # Try DB first
+        try:
+            from app.core.database import SessionLocal
+            from app.models.system_settings import SystemSettings
+            db = SessionLocal()
+            try:
+                db_value = SystemSettings.get_value(db, "trading_symbols", "")
+                if db_value:
+                    return [s.strip() for s in db_value.split(",") if s.strip()]
+            finally:
+                db.close()
+        except Exception:
+            pass
+        return [s.strip() for s in self.TRADING_SYMBOLS.split(",") if s.strip()]
 
     class Config:
         env_file = ".env"

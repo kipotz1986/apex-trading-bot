@@ -17,7 +17,7 @@ class AgentScorer:
     """Service untuk manajemen bobot dinamis agen."""
 
     MIN_WEIGHT = 0.05
-    INITIAL_AGENTS = ["technical", "fundamental", "sentiment", "copy_trader"]
+    INITIAL_AGENTS = ["technical", "fundamental", "sentiment"]
 
     def __init__(self, db: Session):
         self.db = db

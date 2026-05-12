@@ -33,7 +33,9 @@ class RegimeDetector:
         if not candles or len(candles) < 50:
             return {"regime": "unknown", "confidence": 0.0, "metrics": {}}
 
-        df = pd.DataFrame(candles)
+        # Convert Pydantic models to dicts if needed
+        candles_raw = [c.dict() if hasattr(c, 'dict') else c for c in candles]
+        df = pd.DataFrame(candles_raw)
         
         if not HAS_PANDAS_TA:
             # Fallback sangat sederhana jika pandas-ta tidak ada

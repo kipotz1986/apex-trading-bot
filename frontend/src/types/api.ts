@@ -11,15 +11,15 @@ export interface PortfolioSummary {
 }
 
 export interface OpenPosition {
-  id: string;
+  id: number;
   symbol: string;
-  side: "LONG" | "SHORT";
+  side: "LONG" | "SHORT" | "BUY" | "SELL";
   size: number;
   entry: number;
   current: number;
   leverage: number;
   pnl: number;
-  pnl_percent: number;
+  pnl_percent: number | null;
   status: "profit" | "loss";
 }
 
@@ -43,7 +43,7 @@ export interface Trade {
   id: number;
   symbol: string;
   side: string;
-  amount: number;
+  amount?: number;
   entry_price: number;
   exit_price: number;
   pnl_usd: number;
@@ -53,10 +53,13 @@ export interface Trade {
 }
 
 export interface AgentScore {
-  id: number;
   agent_name: string;
   accuracy_score: number;
   total_predictions: number;
+  successful_predictions: number;
+  score: number;
+  weight: number;
+  status: "CALIBRATING" | "LEARNING" | "STABLE" | "OPTIMIZED" | "STRUGGLING";
   last_updated: string;
 }
 
@@ -67,7 +70,35 @@ export interface AgentDecision {
   action: string;
   reasoning: string;
   consensus_score: number;
+  confidence?: number;
+  market_regime?: string;
   agent_signals: any;
+}
+
+export interface TradeStats {
+  total_trades: number;
+  win_rate: number;
+  profit_factor: number;
+  total_pnl: number;
+  avg_trade_pnl: number;
+}
+
+export interface PromptDetails {
+  prompt_input: string;
+  prompt_output: string;
+  model_name: string;
+  agent_name?: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface ExternalApiDetails {
+  url?: string;
+  method?: string;
+  request_body?: string;
+  response_body?: string;
+  headers?: string;
 }
 
 export interface IntegrationLog {
@@ -79,4 +110,6 @@ export interface IntegrationLog {
   status: "SUCCESS" | "ERROR";
   latency_ms: number;
   error_details?: string;
+  prompt_details?: PromptDetails;
+  external_api_details?: ExternalApiDetails;
 }

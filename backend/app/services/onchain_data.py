@@ -36,6 +36,8 @@ class OnChainDataService:
         self.coingecko_url = "https://api.coingecko.com/api/v3"
         self.blockchain_url = "https://api.blockchain.info"
         self.etherscan_url = "https://api.etherscan.io/api"
+        # Solana mainnet public RPC (no API key needed)
+        self.solana_rpc_url = "https://api.mainnet-beta.solana.com"
 
     # ─── CoinGecko: Market Metrics ─────────────────────────────────────
 
@@ -49,6 +51,9 @@ class OnChainDataService:
         headers = {}
         if self.coingecko_key:
             headers["x-cg-demo-api-key"] = self.coingecko_key
+
+        from app.services.integration_logger import IntegrationLogger
+        IntegrationLogger.record_request(url=url, method="GET", headers=headers)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -78,6 +83,9 @@ class OnChainDataService:
         headers = {}
         if self.coingecko_key:
             headers["x-cg-demo-api-key"] = self.coingecko_key
+
+        from app.services.integration_logger import IntegrationLogger
+        IntegrationLogger.record_request(url=url, method="GET", headers=headers)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -119,19 +127,24 @@ class OnChainDataService:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Blockchain.com menyediakan endpoint stats mentah
-                stats_response = await client.get(f"{self.blockchain_url}/stats")
+                url = f"{self.blockchain_url}/stats"
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=url, method="GET")
+                
+                stats_response = await client.get(url)
                 if stats_response.status_code == 200:
                     data = stats_response.json()
                     result.update({
                         "hash_rate": data.get("hash_rate", 0),
-                        "avg_block_size": data.get("blocks_avg", 0),
+                        "avg_block_size": data.get("blocks_size", 0),
                         "difficulty": data.get("difficulty", 0),
                         "n_blocks_total": data.get("n_blocks_total", 0),
                         "minutes_between_blocks": data.get("minutes_between_blocks", 0),
                     })
 
                 # Unconfirmed transaction count
-                unconf_response = await client.get(f"{self.blockchain_url}/q/unconfirmedcount")
+                unconf_url = f"{self.blockchain_url}/q/unconfirmedcount"
+                unconf_response = await client.get(unconf_url)
                 if unconf_response.status_code == 200:
                     result["unconfirmed_txs"] = int(unconf_response.text.strip())
 
@@ -159,6 +172,9 @@ class OnChainDataService:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=self.etherscan_url, method="GET", body={"min_value_eth": min_value_eth})
+
                 # Ambil block terbaru
                 params = {
                     "module": "proxy",
@@ -184,6 +200,10 @@ class OnChainDataService:
                     return []
 
                 block_data = tx_response.json().get("result", {})
+                # Etherscan can return a string error when key missing/invalid
+                if not isinstance(block_data, dict):
+                    logger.warning("etherscan_block_invalid_response", body=str(block_data)[:80])
+                    return []
                 transactions = block_data.get("transactions", [])
 
                 # Filter by value (ETH in Wei, 1 ETH = 10^18 Wei)
@@ -223,9 +243,15 @@ class OnChainDataService:
                     "action": "gasoracle",
                     "apikey": self.etherscan_key,
                 }
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=self.etherscan_url, method="GET", body=params)
                 response = await client.get(self.etherscan_url, params=params)
                 if response.status_code == 200:
                     data = response.json().get("result", {})
+                    # Etherscan returns a string ("NOTOK", error msg, etc.) when key is missing/invalid
+                    if not isinstance(data, dict):
+                        logger.warning("etherscan_gas_invalid_response", body=str(data)[:80])
+                        return {"low": 0, "average": 0, "high": 0}
                     return {
                         "low": float(data.get("SafeGasPrice", 0)),
                         "average": float(data.get("ProposeGasPrice", 0)),
@@ -236,23 +262,82 @@ class OnChainDataService:
             logger.error("etherscan_gas_failed", error=str(e))
             return {"low": 0, "average": 0, "high": 0}
 
-    # ─── Aggregated Summary ────────────────────────────────────────────
+    # ─── Solana Public RPC: SOL On-Chain Stats ─────────────────────────
+
+    @log_integration(service_type="DATA_FEED", provider_name="SOLANA_RPC", endpoint="getRecentPerformance")
+    async def get_sol_onchain_stats(self) -> Dict[str, Any]:
+        """
+        Ambil statistik on-chain SOL dari Solana mainnet public RPC (free, no key).
+        Returns: TPS, slot height, validator count, recent performance samples.
+        """
+        result = {
+            "tps": 0.0,
+            "slot_height": 0,
+            "epoch": 0,
+            "samples": 0,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=self.solana_rpc_url, method="POST", body={"method": "getRecentPerformanceSamples"})
+
+                # 1. Recent performance: returns TPS samples (each ~60s window)
+                perf_payload = {
+                    "jsonrpc": "2.0", "id": 1,
+                    "method": "getRecentPerformanceSamples",
+                    "params": [4],  # last 4 samples (~4 minutes)
+                }
+                perf_resp = await client.post(self.solana_rpc_url, json=perf_payload)
+                if perf_resp.status_code == 200:
+                    samples = perf_resp.json().get("result", [])
+                    if samples:
+                        # TPS = sum(num_transactions) / sum(sample_period_secs)
+                        total_tx = sum(s.get("numTransactions", 0) for s in samples)
+                        total_sec = sum(s.get("samplePeriodSecs", 60) for s in samples)
+                        result["tps"] = round(total_tx / total_sec, 2) if total_sec > 0 else 0
+                        result["samples"] = len(samples)
+
+                # 2. Current slot (block height equivalent)
+                slot_payload = {"jsonrpc": "2.0", "id": 2, "method": "getSlot"}
+                slot_resp = await client.post(self.solana_rpc_url, json=slot_payload)
+                if slot_resp.status_code == 200:
+                    result["slot_height"] = slot_resp.json().get("result", 0)
+
+                # 3. Current epoch info
+                epoch_payload = {"jsonrpc": "2.0", "id": 3, "method": "getEpochInfo"}
+                epoch_resp = await client.post(self.solana_rpc_url, json=epoch_payload)
+                if epoch_resp.status_code == 200:
+                    info = epoch_resp.json().get("result", {})
+                    result["epoch"] = info.get("epoch", 0)
+
+            logger.info("solana_stats_fetched", tps=result["tps"], slot=result["slot_height"])
+            return result
+        except Exception as e:
+            logger.error("solana_stats_failed", error=str(e))
+            return result
+
+    # ─── Aggregated Summary (symbol-aware) ─────────────────────────────
+
+    def _extract_coin(self, symbol: str) -> str:
+        """Pull coin ticker from a contract symbol e.g. 'BTC/USDT:USDT' -> 'BTC'."""
+        if not symbol:
+            return "BTC"
+        return symbol.split('/')[0].upper()
 
     async def get_summary(self, symbol: str = "BTC") -> NormalizedSentiment:
         """
-        Agregasi data on-chain untuk memberikan skor sentimen fundamental.
-
-        Skor dihitung berdasarkan:
-        - BTC dominance trend (dari CoinGecko)
-        - Market cap change 24h (dari CoinGecko)
-        - BTC unconfirmed tx count (dari Blockchain.com - mempool congestion)
+        Aggregate on-chain data into a sentiment score for the given coin.
+        Each chain uses different signals:
+          BTC: market cap, BTC dominance, mempool congestion
+          ETH: market cap, gas price (high gas = high demand), large transfers count
+          SOL: market cap, TPS health, epoch info
         """
+        coin = self._extract_coin(symbol)
         global_market = await self.get_global_market()
-        btc_stats = await self.get_btc_onchain_stats()
-
         sentiment_score = 0  # -100 (Bearish) to 100 (Bullish)
+        details: Dict[str, Any] = {"coin": coin}
 
-        # 1. Market cap change 24h
+        # ── Global signals (apply to ALL coins) ──
         mc_change = global_market.get("market_cap_change_24h_pct", 0)
         if mc_change > 3:
             sentiment_score += 25
@@ -262,20 +347,81 @@ class OnChainDataService:
             sentiment_score -= 25
         elif mc_change < 0:
             sentiment_score -= 10
+        details["mc_change_24h"] = mc_change
 
-        # 2. BTC Dominance > 50% = flight to safety (slightly bearish for alts)
         btc_dom = global_market.get("btc_dominance", 50)
-        if btc_dom > 55:
-            sentiment_score -= 5  # Capital leaving alts
-        elif btc_dom < 40:
-            sentiment_score += 5  # Alt season
+        details["btc_dominance"] = btc_dom
 
-        # 3. Mempool congestion (many unconfirmed txs = network busy = high demand)
-        unconfirmed = btc_stats.get("unconfirmed_txs", 0)
-        if unconfirmed > 100000:
-            sentiment_score += 10  # Network sangat sibuk
-        elif unconfirmed > 50000:
-            sentiment_score += 5
+        # ── Coin-specific signals ──
+        if coin == "BTC":
+            btc_stats = await self.get_btc_onchain_stats()
+            # BTC dominance high = bullish for BTC itself (flight to safety)
+            if btc_dom > 55:
+                sentiment_score += 5
+            elif btc_dom < 40:
+                sentiment_score -= 5
+            # Mempool congestion = high demand = bullish
+            unconfirmed = btc_stats.get("unconfirmed_txs", 0)
+            if unconfirmed > 100000:
+                sentiment_score += 10
+            elif unconfirmed > 50000:
+                sentiment_score += 5
+            details.update({
+                "hash_rate": btc_stats.get("hash_rate", 0),
+                "unconfirmed_txs": unconfirmed,
+            })
+
+        elif coin == "ETH":
+            # BTC dominance high = bad for ETH (capital leaving alts)
+            if btc_dom > 55:
+                sentiment_score -= 8
+            elif btc_dom < 40:
+                sentiment_score += 8
+
+            gas = await self.get_eth_gas_price()
+            avg_gas = gas.get("average", 0)
+            # High gas = high demand = bullish
+            if avg_gas > 80:
+                sentiment_score += 12
+            elif avg_gas > 40:
+                sentiment_score += 6
+            elif avg_gas < 15:
+                sentiment_score -= 5  # network quiet
+            details["avg_gas_gwei"] = avg_gas
+
+            # Large whale transfers signal momentum
+            whales = await self.get_eth_large_transfers(min_value_eth=500.0)
+            whale_count = len(whales)
+            if whale_count > 5:
+                sentiment_score += 8
+            elif whale_count > 2:
+                sentiment_score += 4
+            details["whale_transfers"] = whale_count
+
+        elif coin == "SOL":
+            # Alt-friendly conditions
+            if btc_dom > 55:
+                sentiment_score -= 10  # SOL hurt more than ETH when BTC dominates
+            elif btc_dom < 40:
+                sentiment_score += 10
+
+            sol_stats = await self.get_sol_onchain_stats()
+            tps = sol_stats.get("tps", 0)
+            # Solana network health: healthy TPS = bullish
+            # Normal TPS range: 1500-3000. Low TPS suggests congestion/issues.
+            if tps > 2500:
+                sentiment_score += 12
+            elif tps > 1500:
+                sentiment_score += 6
+            elif tps < 800:
+                sentiment_score -= 10  # network struggling
+            details.update({
+                "tps": tps,
+                "slot_height": sol_stats.get("slot_height", 0),
+            })
+        else:
+            # Unknown coin — use market-wide signals only
+            details["note"] = f"No specific on-chain signals available for {coin}, using market-wide data"
 
         # Classify
         classification = "Neutral"
@@ -284,9 +430,10 @@ class OnChainDataService:
         elif sentiment_score <= -20:
             classification = "Bearish"
 
+        logger.info("onchain_summary_built", coin=coin, score=sentiment_score, classification=classification)
         return NormalizedSentiment(
-            source="onchain_free",
+            source=f"onchain_{coin.lower()}",
             score=sentiment_score,
             classification=classification,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )

@@ -59,8 +59,8 @@ class MarketDataService:
 
         try:
             since_ms = int(since.timestamp() * 1000) if since else None
-            # Pastikan menggunakan objek exchange dari ExchangeService (ccxt)
-            raw_data = await self.exchange.exchange.fetch_ohlcv(
+            # Gunakan wrapper fetch_ohlcv dari ExchangeService agar ter-log di Integration Logs
+            raw_data = await self.exchange.fetch_ohlcv(
                 symbol, timeframe, since=since_ms, limit=limit
             )
 

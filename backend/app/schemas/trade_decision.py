@@ -27,6 +27,7 @@ class TradeDecision(BaseModel):
     
     # Kondisi pasar saat keputusan dibuat
     market_regime: str = Field(default="unknown")
+    state_vector: Optional[List[float]] = Field(default=None, description="Vektor numerik kondisi pasar untuk RL")
     timestamp: datetime = Field(default_factory=datetime.now)
 
     class Config:

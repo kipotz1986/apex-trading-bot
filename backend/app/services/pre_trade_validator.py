@@ -4,6 +4,7 @@ from app.schemas.trade_decision import TradeDecision
 from app.schemas.portfolio import PortfolioState
 from app.services.risk.circuit_breaker import CircuitBreaker
 from app.services.risk.risk_guard import RiskGuard
+from app.models.system_settings import SystemSettings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -41,8 +42,9 @@ class PreTradeValidator:
             safe_size = await self.risk_guard.calculate_safe_size(
                 decision.position_size_usd, portfolio.total_equity
             )
-            if safe_size < 10.0: # Minimum $10 trade
-                return False, f"Calculated safe size too small: ${safe_size}"
+            min_trade_size = float(SystemSettings.get_value(self.db, "min_trade_size_usd", "10.0"))
+            if safe_size < min_trade_size:
+                return False, f"Calculated safe size too small: ${safe_size} (min: ${min_trade_size})"
             
             # Update decision size to safe size
             decision.position_size_usd = safe_size
@@ -56,15 +58,13 @@ class PreTradeValidator:
             if decision.position_size_usd > portfolio.available_margin:
                 return False, f"Insufficient margin. Required: ${decision.position_size_usd}, Available: ${portfolio.available_margin}"
 
-            # 6. Check Confidence Threshold (Safe Guard)
-            if decision.confidence < 0.4:
-                return False, f"Confidence too low for execution: {decision.confidence}"
+            # 6. Check Confidence Threshold (Safe Guard) — aggressive default
+            min_confidence = float(SystemSettings.get_value(self.db, "consensus_threshold_moderate", "0.15"))
+            if decision.confidence < min_confidence:
+                return False, f"Confidence too low for execution: {decision.confidence:.3f} (min: {min_confidence})"
 
-            # 7. Check Spread (Anti-slippage)
-            if decision.requested_price:
-                slippage = abs(decision.requested_price - market_price) / market_price
-                if slippage > 0.02: # 2% max slippage guard
-                    return False, f"Price slippage too high: {slippage:.2%}"
+            # 7. Check Spread (Anti-slippage) - Simplified as requested_price is not in schema
+            # We skip this for now or could implement based on market_price vs some other reference
 
             logger.info("pre_trade_validation_passed", symbol=decision.symbol, amount=decision.position_size_usd)
             return True, ""

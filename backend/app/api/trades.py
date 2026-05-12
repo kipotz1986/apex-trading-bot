@@ -36,11 +36,26 @@ async def get_trade_history(
     total = query.count()
     trades = query.order_by(desc(Order.created_at)).offset((page - 1) * per_page).limit(per_page).all()
     
+    # Map to frontend-friendly structure
+    formatted_trades = []
+    for t in trades:
+        formatted_trades.append({
+            "id": t.id,
+            "symbol": t.symbol,
+            "side": t.side,
+            "entry_price": t.average_filled_price,
+            "exit_price": t.meta_data.get("exit_price", t.average_filled_price), # Fallback if not closed
+            "pnl_usd": t.pnl_usd,
+            "created_at": t.created_at,
+            "status": t.status,
+            "meta_data": t.meta_data
+        })
+    
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "trades": trades
+        "trades": formatted_trades
     }
 
 @router.get("/stats")
@@ -63,13 +78,13 @@ async def get_trade_stats(
     gross_profit = sum([o.pnl_usd or 0.0 for o in wins])
     gross_loss = abs(sum([o.pnl_usd or 0.0 for o in losses]))
     
-    profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else float('inf')
-    
+    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else None
+
     return {
         "total_trades": len(closed_orders),
         "win_rate": round(len(wins) / len(closed_orders) * 100, 2),
         "total_pnl": round(total_pnl, 2),
-        "profit_factor": round(profit_factor, 2),
+        "profit_factor": profit_factor,
         "avg_trade": round(total_pnl / len(closed_orders), 2)
     }
 

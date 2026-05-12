@@ -42,7 +42,16 @@ manager = ConnectionManager()
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # Auth Handshake (Simplified for now, in prod should check token in query/header)
+    # Accept token from httpOnly cookie (preferred) or query param (fallback)
+    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001)
+        return
+    try:
+        security.verify_token(token)
+    except Exception:
+        await websocket.close(code=4001)
+        return
     await manager.connect(websocket)
     try:
         while True:

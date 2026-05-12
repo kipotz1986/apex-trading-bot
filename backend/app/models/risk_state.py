@@ -26,6 +26,7 @@ class RiskState(Base):
     # Circuit Breaker Status
     # NORMAL | PAUSED | REQUIRES_REVIEW | EMERGENCY_STOP
     system_status = Column(String, default="NORMAL")
+    paused_until = Column(DateTime, nullable=True)
     # Mode tracking
     is_live_enabled = Column(Boolean, default=False)
     paper_trading_started_at = Column(DateTime, default=datetime.utcnow)

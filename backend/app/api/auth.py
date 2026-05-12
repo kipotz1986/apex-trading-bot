@@ -2,7 +2,7 @@
 API Authentication Router.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -38,21 +38,17 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             detail="Incorrect username or password",
         )
     
-    # Check password hash (if set, otherwise allow 'admin' for initial setup)
-    if settings.ADMIN_PASSWORD_HASH:
-        if not security.verify_password(form_data.password, settings.ADMIN_PASSWORD_HASH):
-            log_audit(db, "login_failed", form_data.username, {"reason": "wrong_password"}, ip_address=request.client.host)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-            )
-    else:
-        # Emergency fallback for initial setup only
-        if form_data.password != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-            )
+    if not settings.ADMIN_PASSWORD_HASH:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication not configured — ADMIN_PASSWORD_HASH is not set",
+        )
+    if not security.verify_password(form_data.password, settings.ADMIN_PASSWORD_HASH):
+        log_audit(db, "login_failed", form_data.username, {"reason": "wrong_password"}, ip_address=request.client.host)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
 
     # If we made it here, credentials are correct.
     log_audit(db, "login_step_1_success", form_data.username, ip_address=request.client.host)
@@ -70,9 +66,11 @@ class Verify2FARequest(BaseModel):
     temp_token: str
 
 @router.post("/verify-2fa", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def verify_2fa(
-    fastapi_request: Request,
-    request: Verify2FARequest,
+    request: Request,
+    response: Response,
+    body: Verify2FARequest,
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -80,7 +78,7 @@ async def verify_2fa(
     """
     # Verify temp token
     try:
-        username = security.verify_token(request.temp_token, expected_type="temp_2fa")
+        username = security.verify_token(body.temp_token, expected_type="temp_2fa")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -91,14 +89,25 @@ async def verify_2fa(
     import pyotp
     if settings.TOTP_SECRET:
         totp = pyotp.TOTP(settings.TOTP_SECRET)
-        if not totp.verify(request.totp_code, valid_window=1):
+        if not totp.verify(body.totp_code, valid_window=1):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid 2FA code",
             )
 
     access_token = security.create_access_token(subject=username)
-    log_audit(db, "login_success", username, ip_address=fastapi_request.client.host)
+    log_audit(db, "login_success", username, ip_address=request.client.host)
+    # Set httpOnly cookie so the token is never accessible to JavaScript
+    is_secure = settings.APP_ENV != "development"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=is_secure,
+        samesite="strict",
+        max_age=86400,  # 24 hours
+        path="/",
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me")

@@ -16,10 +16,10 @@ import base64
 import hashlib
 
 def _get_key() -> bytes:
-    """Derive encryption key dari JWT_SECRET."""
-    # Gunakan JWT_SECRET sebagai basis key
-    key = hashlib.sha256(settings.JWT_SECRET.encode()).digest()
-    return base64.urlsafe_b64encode(key)
+    """Get encryption key from ENCRYPTION_KEY."""
+    if not settings.ENCRYPTION_KEY:
+        raise ValueError("ENCRYPTION_KEY is missing from environment. Application cannot start securely.")
+    return settings.ENCRYPTION_KEY.encode()
 
 def encrypt(plaintext: str) -> str:
     """Enkripsi string → encrypted string."""

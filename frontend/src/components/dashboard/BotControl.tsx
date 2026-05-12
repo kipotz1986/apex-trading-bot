@@ -1,6 +1,7 @@
 "use client"
 
-import React from "react"
+import React, { useCallback, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -9,12 +10,25 @@ import { Zap, ShieldAlert, ShieldCheck, Info, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useBotStatus, useToggleBot, useChangeMode } from "@/hooks/useApi"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function BotControl() {
+  const queryClient = useQueryClient()
   const { data: status, isLoading } = useBotStatus()
   const toggleBot = useToggleBot()
   const changeMode = useChangeMode()
+  const [switching, setSwitching] = useState(false)
+
+  // Listen for backend broadcast — invalidate everything when profile switches
+  const onProfileSwitched = useCallback((data: { mode: string; equity: number | null }) => {
+    queryClient.invalidateQueries()
+    setSwitching(false)
+    toast.success(`Switched to ${data.mode} mode`, {
+      description: data.equity !== null ? `Balance: $${data.equity.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "Balance syncing…",
+    })
+  }, [queryClient])
+  useWebSocket("profile_switched", onProfileSwitched)
 
   if (isLoading) {
     return (
@@ -51,18 +65,30 @@ export function BotControl() {
   }
 
   const handleModeChange = async (newMode: string) => {
+    setSwitching(true)
     try {
       await changeMode.mutateAsync(newMode as "live" | "paper")
-      toast.success(`Switched to ${newMode.toUpperCase()} mode`)
+      // Success toast fires via the profile_switched WS event instead
     } catch (err: any) {
-      toast.error("Mode Change Locked", {
-        description: err.response?.data?.detail || "Safety requirements not met."
+      setSwitching(false)
+      const detail = err.response?.data?.detail || "Safety requirements not met."
+      const isCredError = detail.toLowerCase().includes("credentials") || detail.toLowerCase().includes("placeholder")
+      toast.error(isCredError ? "Live Credentials Required" : "Mode Change Locked", {
+        description: detail,
+        duration: isCredError ? 8000 : 5000,
       })
     }
   }
 
   return (
-    <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md overflow-hidden">
+    <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md overflow-hidden relative">
+      {/* Profile-switching overlay */}
+      {switching && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm rounded-[inherit]">
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+          <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Switching Profile…</span>
+        </div>
+      )}
       <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 px-6 py-4">
         <CardTitle className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">
           Master Control
@@ -70,7 +96,7 @@ export function BotControl() {
         <div className={cn(
           "w-2 h-2 rounded-full",
           isRunning ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" : "bg-red-500 shadow-[0_0_10px_#ef4444]",
-          (toggleBot.isPending || changeMode.isPending) && "animate-pulse"
+          (toggleBot.isPending || changeMode.isPending || switching) && "animate-pulse"
         )} />
       </CardHeader>
       
@@ -97,10 +123,10 @@ export function BotControl() {
         {/* Mode Selection */}
         <div className="space-y-4">
           <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-500/50 pl-1">Execution Mode</Label>
-          <RadioGroup 
-            value={mode} 
+          <RadioGroup
+            value={mode}
             onValueChange={handleModeChange}
-            disabled={changeMode.isPending}
+            disabled={changeMode.isPending || switching}
             className="grid grid-cols-2 gap-4"
           >
             <div>
@@ -130,13 +156,15 @@ export function BotControl() {
           </RadioGroup>
         </div>
 
-        {/* Safety Warning */}
-        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 flex gap-3">
-          <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-[10px] leading-relaxed text-amber-500/80 font-medium">
-             <b>Safe Mode:</b> 14-day mandatory trial active. Live trading is currently locked until verification period completes.
-          </p>
-        </div>
+        {/* Safety Warning — only shown while live trading is locked */}
+        {status?.is_live_enabled === false && (
+          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 flex gap-3">
+            <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-[10px] leading-relaxed text-amber-500/80 font-medium">
+               <b>Safe Mode:</b> 14-day mandatory trial active. Live trading is currently locked until verification period completes.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -33,11 +33,16 @@ class PaperTradingEngine:
         leverage: int = 1,
         stop_loss: float = None,
         take_profits: List[float] = None,
-        reasoning: str = ""
+        reasoning: str = "",
+        state_vector: List[float] = None,
+        agent_signals: Dict[str, str] = None
     ) -> Order:
         """
         Mensimulasikan eksekusi order dan menyimpannya ke database.
         """
+        from app.models.risk_state import RiskState
+        risk_state = self.db.query(RiskState).first()
+        
         # 1. Hitung Slippage (Hanya untuk Market Order simulasi)
         slippage = price * self.SLIPPAGE_PCT
         fill_price = price + slippage if side == "BUY" else price - slippage
@@ -60,8 +65,9 @@ class PaperTradingEngine:
             take_profit_prices=take_profits or [],
             fee_usd=fee,
             is_paper=True,
-            is_testnet=False,
-            reasoning=reasoning
+            is_testnet=not risk_state.is_live_enabled if risk_state else True,
+            reasoning=reasoning,
+            meta_data={"state_vector": state_vector, "agent_signals": agent_signals or {}}
         )
         
         self.db.add(order)

@@ -53,6 +53,8 @@ class AIProvider(ABC):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """
         Kirim percakapan ke AI dan dapatkan respons.
@@ -66,16 +68,35 @@ class AIProvider(ABC):
         data: str,
         instruction: str,
         json_mode: bool = True,
+        agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """
         Shortcut untuk analisis data. Mengirim system prompt + data + instruksi.
         """
         pass
 
+    def get_advanced_model(self) -> str:
+        """Get the higher-tier model for this provider."""
+        if "openai" in str(self.__class__).lower():
+            return "gpt-4o"
+        if "google" in str(self.__class__).lower():
+            return "gemini-1.5-pro"
+        if "anthropic" in str(self.__class__).lower():
+            return "claude-3-5-sonnet-20240620"
+        return self.model
+
     @abstractmethod
     async def embed(self, text: str) -> list[float]:
         """
         Convert teks menjadi vektor embedding.
+        """
+        pass
+
+    @abstractmethod
+    async def list_models(self) -> list[str]:
+        """
+        Dapatkan daftar model yang tersedia untuk provider ini.
         """
         pass
 

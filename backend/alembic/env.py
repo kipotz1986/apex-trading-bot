@@ -18,8 +18,8 @@ from app.models.order import Order
 from app.models.risk_state import RiskState
 from app.models.candle import Candle
 from app.models.audit_log import AuditLog
-from app.models.copy_trade import TopTrader, CopyTradeEvent
 from app.models.risk_snapshot import RiskSnapshot
+from app.models.exchange_credential import ExchangeCredential
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

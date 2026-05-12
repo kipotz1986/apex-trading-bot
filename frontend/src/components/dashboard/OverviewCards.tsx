@@ -11,12 +11,29 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { usePortfolioSummary } from "@/hooks/useApi"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function OverviewCards() {
-  const { data, isLoading } = usePortfolioSummary();
+  const { data: initialData, isLoading } = usePortfolioSummary();
+  const [data, setData] = React.useState<any>(null);
 
-  if (isLoading) {
+  // Initialize data when initialData arrives
+  React.useEffect(() => {
+    if (initialData && !data) {
+      setData(initialData);
+    }
+  }, [initialData, data]);
+
+  // Listen for real-time portfolio updates
+  useWebSocket("portfolio_update", (update) => {
+    setData((prev: any) => ({
+      ...prev,
+      ...update,
+    }));
+  });
+
+  if (isLoading && !data) {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
@@ -34,6 +51,11 @@ export function OverviewCards() {
     );
   }
 
+  const equityUtilization = data?.balance > 0
+    ? Math.min(100, Math.max(0, (data.equity / data.balance) * 100))
+    : 0
+  const winRate = data?.win_rate || 0
+
   const stats = [
     {
       title: "Total Balance",
@@ -41,7 +63,8 @@ export function OverviewCards() {
       change: data?.total_pnl ? `${data.total_pnl > 0 ? '+' : ''}${data.total_pnl.toFixed(2)}` : "0.00",
       trend: (data?.total_pnl || 0) >= 0 ? "up" : "down",
       icon: DollarSign,
-      color: "emerald"
+      color: "emerald",
+      progress: equityUtilization,
     },
     {
       title: "Current Equity",
@@ -49,7 +72,8 @@ export function OverviewCards() {
       change: data?.unrealized_pnl ? `${data.unrealized_pnl > 0 ? '+' : ''}${data.unrealized_pnl.toFixed(2)}` : "0.00",
       trend: (data?.unrealized_pnl || 0) >= 0 ? "up" : "down",
       icon: Activity,
-      color: "blue"
+      color: "blue",
+      progress: winRate,
     },
     {
       title: "Today's PnL",
@@ -57,7 +81,8 @@ export function OverviewCards() {
       change: "Last 24h",
       trend: (data?.daily_pnl || 0) >= 0 ? "up" : "down",
       icon: TrendingUp,
-      color: (data?.daily_pnl || 0) >= 0 ? "emerald" : "red"
+      color: (data?.daily_pnl || 0) >= 0 ? "emerald" : "red",
+      progress: Math.min(100, Math.max(0, 50 + (data?.daily_pnl || 0))),
     },
     {
       title: "Win Rate",
@@ -65,7 +90,8 @@ export function OverviewCards() {
       change: `${data?.total_trades || 0} trades`,
       trend: "up",
       icon: Percent,
-      color: "emerald"
+      color: "emerald",
+      progress: winRate,
     }
   ]
 
@@ -92,9 +118,9 @@ export function OverviewCards() {
             </div>
             
             <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-               <div 
-                 className={`h-full bg-${stat.color}-500/40 rounded-full transition-all duration-1000`} 
-                 style={{ width: `${Math.floor(Math.random() * 40) + 40}%` }}
+               <div
+                 className={`h-full bg-${stat.color}-500/40 rounded-full transition-all duration-1000`}
+                 style={{ width: `${stat.progress}%` }}
                />
             </div>
           </CardContent>

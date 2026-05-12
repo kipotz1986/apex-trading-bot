@@ -135,6 +135,7 @@ class TechnicalAnalystAgent:
         self,
         symbol: str,
         candles_by_timeframe: Dict[str, List[Dict]],
+        advanced: bool = False,
     ) -> AgentSignal:
         """
         Analisa teknikal lengkap pada satu trading pair.
@@ -143,7 +144,9 @@ class TechnicalAnalystAgent:
             # Step 1: Hitung indikator untuk setiap timeframe
             all_indicators = {}
             for tf, candles in candles_by_timeframe.items():
-                df = pd.DataFrame(candles)
+                # Convert Pydantic models to dicts if needed
+                candles_raw = [c.dict() if hasattr(c, 'dict') else c for c in candles]
+                df = pd.DataFrame(candles_raw)
                 all_indicators[tf] = self.calculate_indicators(df)
 
             # Step 2: Deteksi alignment (T-4.2)
@@ -159,7 +162,7 @@ class TechnicalAnalystAgent:
             instruction = (
                 f"Analyze the technical indicators for {symbol} across all timeframes. "
                 f"Prioritize higher timeframes for trend and lower for entry timing. "
-                f"Produce a JSON trading signal. If alignment is true, boost confidence."
+                f"Produce a JSON trading signal."
             )
 
             response = await self.ai.analyze(
@@ -167,6 +170,8 @@ class TechnicalAnalystAgent:
                 data=data_str,
                 instruction=instruction,
                 json_mode=True,
+                agent_name=self.AGENT_NAME,
+                advanced=advanced,
             )
 
             # Step 4: Parse response AI

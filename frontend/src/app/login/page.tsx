@@ -24,12 +24,14 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     try {
-      const formData = new FormData()
+      const formData = new URLSearchParams()
       formData.append("username", username)
       formData.append("password", password)
 
       const { data } = await api.post("/auth/login", formData, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
       })
 
       if (data.requires_2fa) {
@@ -56,7 +58,6 @@ export default function LoginPage() {
       })
 
       if (data.access_token) {
-        localStorage.setItem("token", data.access_token)
         toast.success("Authentication Successful")
         router.push("/dashboard")
       }

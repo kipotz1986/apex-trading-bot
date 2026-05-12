@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.risk_state import RiskState
 from app.models.order import Order
+from app.models.system_settings import SystemSettings
 from app.services.telegram import TelegramService
 from app.core.logging import get_logger
 
@@ -28,43 +29,45 @@ class CircuitBreaker:
         Return: (is_triggered, reason)
         """
         state = self._get_or_create_state()
-        
+
+        # Aggressive defaults — only emergency-stop on truly large losses
+        max_drawdown_pct = float(SystemSettings.get_value(self.db, "max_drawdown_pct", "30.0"))
+        daily_loss_limit = float(SystemSettings.get_value(self.db, "daily_loss_limit", "12.0"))
+        weekly_loss_limit = float(SystemSettings.get_value(self.db, "weekly_loss_limit", "20.0"))
+
         # 1. Update Equity Peak & Drawdown
         if current_equity > state.equity_peak:
             state.equity_peak = current_equity
             self.db.commit()
-            
+
         drawdown_pct = 0.0
         if state.equity_peak > 0:
             drawdown_pct = (state.equity_peak - current_equity) / state.equity_peak * 100
-            
-        if drawdown_pct >= 15.0:
+
+        if drawdown_pct >= max_drawdown_pct:
             state.system_status = "EMERGENCY_STOP"
             self.db.commit()
-            
-            # Notify Telegram
-            self._send_instant_alert("EMERGENCY_STOP", f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: 15%)")
-            
-            return True, f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: 15%)"
+            self._send_instant_alert("EMERGENCY_STOP", f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: {max_drawdown_pct}%)")
+            return True, f"Max drawdown reached: {drawdown_pct:.2f}% (Limit: {max_drawdown_pct}%)"
 
-        # 2. Daily Loss Limit (3%)
+        # 2. Daily Loss Limit
         daily_pnl = self._calculate_realized_pnl(days=1)
         daily_loss_pct = (daily_pnl / current_equity) * 100 if current_equity > 0 else 0
-        
-        if daily_loss_pct <= -3.0:
+
+        if daily_loss_pct <= -daily_loss_limit:
             state.system_status = "PAUSED"
             state.paused_until = datetime.utcnow() + timedelta(hours=24)
             self.db.commit()
-            return True, f"Daily loss limit reached: {daily_loss_pct:.2f}% (Limit: -3%)"
+            return True, f"Daily loss limit reached: {daily_loss_pct:.2f}% (Limit: -{daily_loss_limit}%)"
 
-        # 3. Weekly Loss Limit (7%)
+        # 3. Weekly Loss Limit
         weekly_pnl = self._calculate_realized_pnl(days=7)
         weekly_loss_pct = (weekly_pnl / current_equity) * 100 if current_equity > 0 else 0
-        
-        if weekly_loss_pct <= -7.0:
+
+        if weekly_loss_pct <= -weekly_loss_limit:
             state.system_status = "REQUIRES_REVIEW"
             self.db.commit()
-            return True, f"Weekly loss limit reached: {weekly_loss_pct:.2f}% (Limit: -7%)"
+            return True, f"Weekly loss limit reached: {weekly_loss_pct:.2f}% (Limit: -{weekly_loss_limit}%)"
 
         # 4. Check if currently paused
         if state.system_status == "PAUSED":

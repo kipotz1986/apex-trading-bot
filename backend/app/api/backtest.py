@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.services.backtesting import BacktestEngine
 from app.services.candle_storage import CandleStorageService
+from app.core.factory import create_orchestrator
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import List, Optional
@@ -23,46 +24,45 @@ async def run_backtest(
     current_user: str = Depends(deps.get_current_user)
 ):
     """
-    Menjalankan pengujian strategi pada data historis.
+    Menjalankan pengujian strategi pada data historis menggunakan orchestrator aktual.
     """
     candle_service = CandleStorageService(db)
     
     # 1. Ambil data historis
-    # (Note: In a real app, this might fetch from exchange if not in DB)
+    # Mengambil data dari storage lokal yang sudah disinkronisasi
     candles = candle_service.get_candles(
         symbol=request.symbol,
         timeframe=request.timeframe,
         start_time=request.start_date,
-        limit=2000 # limit to 2000 candles for simulation speed
+        limit=2000 # limit untuk kecepatan simulasi
     )
     
     if not candles or len(candles) < 50:
         raise HTTPException(
             status_code=400, 
-            detail=f"Not enough historical data for {request.symbol}. Found {len(candles)} candles."
+            detail=f"Data historis tidak cukup untuk {request.symbol}. Ditemukan {len(candles)} candle."
         )
 
-    # Convert SQLAlchemy objects to Dicts for engine
-    candle_data = []
-    for c in candles:
-        candle_data.append({
+    # Konversi objek SQLAlchemy ke list dictionary untuk engine
+    candle_data = [
+        {
             "timestamp": c.timestamp,
             "open": c.open,
             "high": c.high,
             "low": c.low,
             "close": c.close,
             "volume": c.volume
-        })
+        }
+        for c in candles
+    ]
 
-    # 2. Setup Engine
-    # (Simplified: We use a lightweight version of orchestrator or mock it)
-    # For now, let's use the actual engine if we can.
-    # Note: Orchestrator initialization is complex, so we might need a Factory.
+    # 2. Inisialisasi Orchestrator via Factory
+    # Ini memastikan strategi yang sama digunakan di live dan backtest.
+    orchestrator = create_orchestrator(db)
     
-    # Placeholder for a simpler backtest until Orchestrator Factory is ready
-    engine = BacktestEngine(db, None) # None for orchestrator for now
+    # 3. Jalankan Engine dengan Orchestrator asli
+    engine = BacktestEngine(db, orchestrator)
     
-    # Overriding the run method logic internally or using a specific backtest strategy
     results = await engine.run(
         symbol=request.symbol,
         historical_candles=candle_data,

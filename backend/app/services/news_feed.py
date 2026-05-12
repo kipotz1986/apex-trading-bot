@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.schemas.market_data import NormalizedNews
+from app.services.integration_logger import log_integration
 
 logger = get_logger(__name__)
 
@@ -25,6 +26,7 @@ class NewsFeedService:
         self.base_url = "https://min-api.cryptocompare.com/data/v2/news/"
         self.timeout = 10.0
 
+    @log_integration(service_type="DATA_FEED", provider_name="CRYPTOCOMPARE", endpoint="fetch_news")
     async def get_latest_news(
         self, 
         currencies: Optional[List[str]] = None, 
@@ -44,9 +46,15 @@ class NewsFeedService:
         if currencies:
             params["categories"] = ",".join(currencies)
 
+        headers = {}
+        if settings.CRYPTOCOMPARE_API_KEY:
+            headers["authorization"] = f"Apikey {settings.CRYPTOCOMPARE_API_KEY}"
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.base_url, params=params)
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=self.base_url, method="GET", body=params, headers=headers)
+                response = await client.get(self.base_url, params=params, headers=headers)
                 if response.status_code == 200:
                     data = response.json()
                     results = data.get("Data", [])
@@ -62,6 +70,7 @@ class NewsFeedService:
                             timestamp=dt_obj,
                             url=item.get("url"),
                             importance=self._calculate_importance(item),
+                            sentiment_score=self._calculate_sentiment(item.get("title", "")),
                             currencies=item.get("categories", "").split("|")
                         ))
                     
@@ -84,3 +93,19 @@ class NewsFeedService:
             return "medium"
         else:
             return "low"
+
+    def _calculate_sentiment(self, title: str) -> float:
+        """Estimasi sentiment score sederhana berdasarkan keyword."""
+        title_lower = title.lower()
+        positive_words = ["surge", "jump", "bull", "high", "adopt", "launch", "partner", "gain", "up", "breakout", "approve", "win"]
+        negative_words = ["crash", "drop", "bear", "low", "ban", "hack", "scam", "down", "selloff", "sec", "sue", "bankrupt"]
+        
+        score = 0.0
+        for word in positive_words:
+            if word in title_lower:
+                score += 0.3
+        for word in negative_words:
+            if word in title_lower:
+                score -= 0.3
+                
+        return max(min(score, 1.0), -1.0)

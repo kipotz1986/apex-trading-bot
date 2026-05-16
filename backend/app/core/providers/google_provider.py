@@ -30,9 +30,15 @@ class GoogleProvider(AIProvider):
         max_tokens: int = 4096,
         json_mode: bool = False,
         agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """Kirim percakapan ke Google Gemini."""
         try:
+            target_model = self.get_advanced_model() if advanced else self.model
+            
+            # Use specific model instance for this call
+            model_instance = self.client if target_model == self.model else genai.GenerativeModel(target_model)
+
             # Convert ChatMessage ke format Gemini (role: parts)
             history = []
             for msg in messages[:-1]:
@@ -40,7 +46,7 @@ class GoogleProvider(AIProvider):
                 history.append({"role": role, "parts": [msg.content]})
             
             # Start chat session
-            chat_session = self.client.start_chat(history=history)
+            chat_session = model_instance.start_chat(history=history)
             
             # Setup generation config
             config = genai.types.GenerationConfig(
@@ -57,7 +63,6 @@ class GoogleProvider(AIProvider):
             )
             
             # Usage info
-            # Gemini response usually contains usage info in response.usage_metadata
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
                 "completion_tokens": response.usage_metadata.candidates_token_count,
@@ -65,13 +70,14 @@ class GoogleProvider(AIProvider):
             }
 
             logger.info("google_chat_completed",
-                model=self.model,
-                tokens_used=usage["total_tokens"]
+                model=target_model,
+                tokens_used=usage["total_tokens"],
+                advanced=advanced
             )
 
             return AIResponse(
                 content=response.text,
-                model=self.model,
+                model=target_model,
                 provider="google",
                 usage=usage,
                 raw_response=response,
@@ -91,6 +97,7 @@ class GoogleProvider(AIProvider):
         instruction: str,
         json_mode: bool = True,
         agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """Shortcut untuk analisis data."""
         messages = [
@@ -105,6 +112,7 @@ class GoogleProvider(AIProvider):
             temperature=0.3,
             json_mode=json_mode,
             agent_name=agent_name,
+            advanced=advanced,
         )
 
     @log_integration(service_type="AI_PROVIDER", provider_name="GOOGLE", endpoint="embed")

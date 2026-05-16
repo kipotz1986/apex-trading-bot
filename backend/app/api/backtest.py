@@ -58,7 +58,7 @@ async def run_backtest(
 
     # 2. Inisialisasi Orchestrator via Factory
     # Ini memastikan strategi yang sama digunakan di live dan backtest.
-    orchestrator = create_orchestrator(db)
+    orchestrator = await create_orchestrator(db)
     
     # 3. Jalankan Engine dengan Orchestrator asli
     engine = BacktestEngine(db, orchestrator)

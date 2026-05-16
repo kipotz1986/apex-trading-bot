@@ -46,6 +46,9 @@ class SystemSettings(Base):
             "advanced_reasoning_enabled": "false",
             "telegram_bot_token": "",
             "telegram_chat_id": "",
+            "bot_interval_seconds": "60",
+            "min_hold_time_minutes": "30",
+            "loss_tolerance_pct": "5.0",
         }
         for key, value in defaults.items():
             if not db.query(cls).filter(cls.key == key).first():

@@ -55,29 +55,44 @@ async def get_portfolio_summary(
             "equity": 0.0,
             "unrealized_pnl": 0.0,
             "daily_pnl": 0.0,
+            "total_pnl": 0.0,
             "total_trades": 0,
-            "win_rate": 0.0
+            "win_rate": 0.0,
+            "system_status": "NORMAL",
+            "mode": "paper"
         }
 
+    is_paper_mode = not risk_state.is_live_enabled
+
     # 1. Unrealized PnL from open positions
-    open_positions = db.query(Order).filter(Order.status.in_(["OPEN", "FILLED"])).all()
+    open_positions = db.query(Order).filter(
+        Order.status.in_(["OPEN", "FILLED"]),
+        Order.is_paper == is_paper_mode
+    ).all()
     unrealized_pnl = sum([p.pnl_usd or 0.0 for p in open_positions])
 
     # 2. Daily PnL (Closed trades today + Unrealized movement)
     today_start = datetime.combine(datetime.now().date(), time.min)
     daily_closed_pnl = db.query(func.sum(Order.pnl_usd)).filter(
         Order.status == "CLOSED", 
-        Order.updated_at >= today_start
+        Order.updated_at >= today_start,
+        Order.is_paper == is_paper_mode
     ).scalar() or 0.0
     
     # 3. Overall Win Rate
-    closed_orders_query = db.query(Order).filter(Order.status == "CLOSED")
+    closed_orders_query = db.query(Order).filter(
+        Order.status == "CLOSED",
+        Order.is_paper == is_paper_mode
+    )
     total_trades = closed_orders_query.count()
     winning_trades = closed_orders_query.filter(Order.pnl_usd > 0).count()
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
     
     # 4. Total PnL (All closed trades)
-    total_pnl = db.query(func.sum(Order.pnl_usd)).filter(Order.status == "CLOSED").scalar() or 0.0
+    total_pnl = db.query(func.sum(Order.pnl_usd)).filter(
+        Order.status == "CLOSED",
+        Order.is_paper == is_paper_mode
+    ).scalar() or 0.0
 
     return {
         "balance": risk_state.current_equity - unrealized_pnl, # Simplified: Balance = Equity - Unrealized
@@ -102,7 +117,10 @@ async def get_equity_history(
     hours=0 means ALL history. Otherwise filters to the last N hours.
     Snapshot density: saved every 60s, so limit = hours * 60 capped at 2000.
     """
-    query = db.query(RiskSnapshot)
+    risk_state = db.query(RiskState).first()
+    is_paper_mode = not risk_state.is_live_enabled if risk_state else True
+
+    query = db.query(RiskSnapshot).filter(RiskSnapshot.is_paper == is_paper_mode)
 
     if hours > 0:
         since = datetime.utcnow() - timedelta(hours=hours)
@@ -131,7 +149,13 @@ async def get_open_positions(
     """
     Returns all currently open positions with real-time PnL calculation.
     """
-    positions = db.query(Order).filter(Order.status.in_(["OPEN", "FILLED"])).all()
+    risk_state = db.query(RiskState).first()
+    is_paper_mode = not risk_state.is_live_enabled if risk_state else True
+    
+    positions = db.query(Order).filter(
+        Order.status.in_(["OPEN", "FILLED"]),
+        Order.is_paper == is_paper_mode
+    ).all()
     
     return [
         {
@@ -158,13 +182,14 @@ async def get_klines(
 ):
     """
     Returns historical OHLCV candles for the candlestick chart.
-    symbol: BTC/USDT | ETH/USDT | SOL/USDT
+    symbol: BTC/USDT | ETH/USDT | SOL/USDT | XRP/USDT
     timeframe: 1m | 5m | 15m | 1h | 4h
     """
     SYMBOL_MAP = {
         "BTC/USDT": "BTC/USDT:USDT",
         "ETH/USDT": "ETH/USDT:USDT",
         "SOL/USDT": "SOL/USDT:USDT",
+        "XRP/USDT": "XRP/USDT:USDT",
     }
     ccxt_symbol = SYMBOL_MAP.get(symbol, symbol)
     try:
@@ -204,7 +229,7 @@ async def close_position_manually(
 
     try:
         from app.core.factory import ServiceFactory
-        orchestrator = ServiceFactory.get_orchestrator(db)
+        orchestrator = await ServiceFactory.get_orchestrator(db)
         
         success = await orchestrator.executor.close_position(
             symbol=order.symbol,

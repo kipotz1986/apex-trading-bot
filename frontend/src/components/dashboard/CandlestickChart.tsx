@@ -173,8 +173,8 @@ export function CandlestickChart() {
               className={cn(
                 "px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
                 symbol === s
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                  : "text-white/40 hover:text-white hover:bg-white/5"
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               {s}
@@ -191,8 +191,8 @@ export function CandlestickChart() {
               className={cn(
                 "px-3 py-1 rounded-md text-[10px] font-bold transition-all",
                 tfLabel === t.label
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                  : "text-white/40 hover:text-white hover:bg-white/5"
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               {t.label}
@@ -207,14 +207,14 @@ export function CandlestickChart() {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
         </span>
-        <span className="text-[9px] font-bold text-emerald-500/60 uppercase tracking-widest">Live</span>
+        <span className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">Live</span>
       </div>
 
       {/* Chart container */}
       <div className="relative h-[380px] w-full">
         {isLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#050B0A]/60 rounded-xl">
-            <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest animate-pulse">Loading…</span>
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-popover/60 rounded-xl">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest animate-pulse">Loading…</span>
           </div>
         )}
         <div ref={containerRef} className="h-full w-full" />

@@ -55,11 +55,13 @@ async def get_all_settings(
     threshold_moderate = SystemSettings.get_value(db, "consensus_threshold_moderate", "0.15")
     ai_provider = SystemSettings.get_value(db, "ai_provider", settings.AI_PROVIDER)
     ai_model = SystemSettings.get_value(db, "ai_model", settings.AI_MODEL)
+    bot_interval = SystemSettings.get_value(db, "bot_interval_seconds", "60")
 
     # Provider Keys — stored encrypted, never return plaintext
     openai_key_enc = SystemSettings.get_value(db, "ai_api_key_openai", "")
     google_key_enc = SystemSettings.get_value(db, "ai_api_key_google", "")
     anthropic_key_enc = SystemSettings.get_value(db, "ai_api_key_anthropic", "")
+    nvidia_key_enc = SystemSettings.get_value(db, "ai_api_key_nvidia", "")
 
     max_total_exposure = SystemSettings.get_value(db, "max_total_exposure", "80.0")
     
@@ -73,6 +75,9 @@ async def get_all_settings(
         "maxTotalExposure": float(max_total_exposure),
         "consensusThresholdStrong": float(threshold_strong),
         "consensusThresholdModerate": float(threshold_moderate),
+        "minHoldTimeMinutes": int(SystemSettings.get_value(db, "min_hold_time_minutes", "30")),
+        "lossTolerancePct": float(SystemSettings.get_value(db, "loss_tolerance_pct", "5.0")),
+        "botIntervalSeconds": int(bot_interval),
         "aiProvider": ai_provider,
         "advancedReasoningEnabled": adv_reasoning,
         "tradingSymbols": settings.get_symbol_list(),
@@ -82,6 +87,7 @@ async def get_all_settings(
             "openai_api_key": "****" if openai_key_enc else "",
             "google_api_key": "****" if google_key_enc else "",
             "anthropic_api_key": "****" if anthropic_key_enc else "",
+            "nvidia_api_key": "****" if nvidia_key_enc else "",
         },
         "exchange": {
             "name": settings.EXCHANGE_NAME,
@@ -112,6 +118,12 @@ async def update_ai_settings(
         SystemSettings.set_value(db, "ai_provider", str(payload["provider"]))
     if "model" in payload:
         SystemSettings.set_value(db, "ai_model", str(payload["model"]))
+    if "botIntervalSeconds" in payload:
+        interval_val = int(payload["botIntervalSeconds"])
+        SystemSettings.set_value(db, "bot_interval_seconds", str(interval_val))
+        from app.services.bot_runner import bot_runner
+        bot_runner.interval = interval_val
+        logger.info("bot_runner_interval_updated_immediately", interval=interval_val)
     
     # Save provider keys encrypted; skip if masked (unchanged)
     if payload.get("openai_api_key") and not str(payload["openai_api_key"]).startswith("****"):
@@ -120,6 +132,8 @@ async def update_ai_settings(
         SystemSettings.set_value(db, "ai_api_key_google", encrypt(payload["google_api_key"]))
     if payload.get("anthropic_api_key") and not str(payload["anthropic_api_key"]).startswith("****"):
         SystemSettings.set_value(db, "ai_api_key_anthropic", encrypt(payload["anthropic_api_key"]))
+    if payload.get("nvidia_api_key") and not str(payload["nvidia_api_key"]).startswith("****"):
+        SystemSettings.set_value(db, "ai_api_key_nvidia", encrypt(payload["nvidia_api_key"]))
 
     # Scrub sensitive fields before audit log
     safe_payload = {k: ("***REDACTED***" if "api_key" in k.lower() or "secret" in k.lower() else v) for k, v in payload.items()}
@@ -146,7 +160,8 @@ async def get_ai_models(
         fallbacks = {
             "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
             "google": ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"],
-            "anthropic": ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-haiku-20240307"]
+            "anthropic": ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-haiku-20240307"],
+            "nvidia": ["meta/llama-3.1-405b-instruct", "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct"]
         }
         return fallbacks.get(provider, [])
 
@@ -170,6 +185,10 @@ async def update_risk_settings(
         SystemSettings.set_value(db, "consensus_threshold_moderate", str(payload["consensusThresholdModerate"]))
     if "maxTotalExposure" in payload:
         SystemSettings.set_value(db, "max_total_exposure", str(payload["maxTotalExposure"]))
+    if "minHoldTimeMinutes" in payload:
+        SystemSettings.set_value(db, "min_hold_time_minutes", str(int(payload["minHoldTimeMinutes"])))
+    if "lossTolerancePct" in payload:
+        SystemSettings.set_value(db, "loss_tolerance_pct", str(payload["lossTolerancePct"]))
 
     log_audit(db, "settings_update_risk", current_user, payload, ip_address=request.client.host)
     logger.info("settings_updated_risk", user=current_user)
@@ -180,6 +199,7 @@ _SUPPORTED_SYMBOLS = [
     {"symbol": "BTC/USDT:USDT", "name": "Bitcoin", "ticker": "BTC", "onchain_source": "Blockchain.com (hash rate, mempool)"},
     {"symbol": "ETH/USDT:USDT", "name": "Ethereum", "ticker": "ETH", "onchain_source": "Etherscan (gas price, whale transfers)"},
     {"symbol": "SOL/USDT:USDT", "name": "Solana", "ticker": "SOL", "onchain_source": "Solana RPC (TPS, epoch)"},
+    {"symbol": "XRP/USDT:USDT", "name": "Ripple", "ticker": "XRP", "onchain_source": "XRPL (ledger sequence, validators)"},
 ]
 
 
@@ -404,6 +424,7 @@ async def test_exchange_connection(
     if not api_key or not api_secret:
         raise HTTPException(status_code=400, detail="Valid API key and secret required for testing.")
 
+    test_exchange = None
     try:
         if base_url:
             parsed = urlparse(base_url)
@@ -422,13 +443,18 @@ async def test_exchange_connection(
 
         # Test connection by fetching balance
         await test_exchange.get_balance()
-        await test_exchange.close()
-        
+
         logger.info("exchange_connection_tested", profile=profile, status="success")
         return {"status": "success", "message": "Connection successful"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("exchange_connection_test_failed", profile=profile, error=str(e))
-        # Ensure we close it even on failure
-        if 'test_exchange' in locals():
-            await test_exchange.close()
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+    finally:
+        # Single close path — always release the ccxt/aiohttp session.
+        if test_exchange is not None:
+            try:
+                await test_exchange.close()
+            except Exception as close_err:
+                logger.warning("test_exchange_close_failed", error=str(close_err))

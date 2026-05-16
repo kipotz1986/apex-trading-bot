@@ -29,19 +29,51 @@ class ServiceFactory:
     def __init__(self, db: Session):
         # AI Provider Configuration from DB (with environment defaults)
         from app.models.system_settings import SystemSettings
-        ai_provider = SystemSettings.get_value(db, "ai_provider", settings.AI_PROVIDER)
-        ai_model = SystemSettings.get_value(db, "ai_model", settings.AI_MODEL)
+        self._ai_provider_name = SystemSettings.get_value(db, "ai_provider", settings.AI_PROVIDER)
+        
+        # Intelligent model selection: fallback to provider-specific defaults if DB is empty/invalid
+        db_model = SystemSettings.get_value(db, "ai_model")
+        if not db_model or db_model == "None":
+            if self._ai_provider_name == "nvidia":
+                self._ai_model_name = "meta/llama-3.1-70b-instruct"
+            elif self._ai_provider_name == "google":
+                self._ai_model_name = "gemini-1.5-pro"
+            elif self._ai_provider_name == "anthropic":
+                self._ai_model_name = "claude-3-5-sonnet-20240620"
+            else:
+                self._ai_model_name = settings.AI_MODEL
+        else:
+            self._ai_model_name = db_model
+        
+        ai_provider = self._ai_provider_name
+        ai_model = self._ai_model_name
         
         # Provider-specific API Keys
-        openai_key = SystemSettings.get_value(db, "ai_api_key_openai", settings.AI_API_KEY)
-        google_key = SystemSettings.get_value(db, "ai_api_key_google", settings.AI_API_KEY)
-        anthropic_key = SystemSettings.get_value(db, "ai_api_key_anthropic", settings.AI_API_KEY)
+        from app.core.encryption import decrypt
+        
+        def safe_decrypt(val):
+            if not val: return val
+            try:
+                # Fernet tokens start with gAAAAA
+                if val.startswith("gAAAAA"):
+                    return decrypt(val)
+            except:
+                pass
+            return val
+
+        openai_key = safe_decrypt(SystemSettings.get_value(db, "ai_api_key_openai", settings.AI_API_KEY))
+        google_key = safe_decrypt(SystemSettings.get_value(db, "ai_api_key_google", settings.AI_API_KEY))
+        anthropic_key = safe_decrypt(SystemSettings.get_value(db, "ai_api_key_anthropic", settings.AI_API_KEY))
+        nvidia_key = safe_decrypt(SystemSettings.get_value(db, "ai_api_key_nvidia", settings.NVIDIA_API_KEY))
 
         if ai_provider == "google":
             self.ai = GoogleProvider(api_key=google_key, model=ai_model)
         elif ai_provider == "anthropic":
             from app.core.providers.anthropic_provider import AnthropicProvider
             self.ai = AnthropicProvider(api_key=anthropic_key, model=ai_model)
+        elif ai_provider == "nvidia":
+            from app.core.providers.nvidia_provider import NvidiaProvider
+            self.ai = NvidiaProvider(api_key=nvidia_key, model=ai_model)
         else:
             self.ai = OpenAIProvider(api_key=openai_key, model=ai_model)
             
@@ -117,8 +149,65 @@ class ServiceFactory:
         except Exception as e:
             logger.error("failed_to_load_rl_model", error=str(e))
 
+    async def close(self):
+        """Release all owned async resources (ccxt session, telegram client)."""
+        # Exchange (ccxt async client → aiohttp session)
+        try:
+            if getattr(self, "exchange", None) is not None:
+                await self.exchange.close()
+        except Exception as e:
+            logger.warning("factory_exchange_close_failed", error=str(e))
+        # Telegram HTTP client
+        try:
+            if getattr(self, "telegram", None) is not None:
+                await self.telegram.close()
+        except Exception as e:
+            logger.warning("factory_telegram_close_failed", error=str(e))
+
     @classmethod
-    def get_orchestrator(cls, db: Session) -> MasterOrchestrator:
+    async def shutdown(cls):
+        """Close the singleton instance and drop it. Safe to call at app shutdown."""
+        if cls._instance is not None:
+            await cls._instance.close()
+            cls._instance = None
+            logger.info("service_factory_shutdown_complete")
+
+    @classmethod
+    async def get_orchestrator(cls, db: Session) -> MasterOrchestrator:
+        from app.models.system_settings import SystemSettings
+
+        # Check if AI settings changed in DB
+        db_provider = SystemSettings.get_value(db, "ai_provider", settings.AI_PROVIDER)
+        db_model_raw = SystemSettings.get_value(db, "ai_model")
+
+        # Determine what the effective model would be
+        if not db_model_raw or db_model_raw == "None":
+            if db_provider == "nvidia":
+                effective_db_model = "meta/llama-3.1-70b-instruct"
+            elif db_provider == "google":
+                effective_db_model = "gemini-1.5-pro"
+            elif db_provider == "anthropic":
+                effective_db_model = "claude-3-5-sonnet-20240620"
+            else:
+                effective_db_model = settings.AI_MODEL
+        else:
+            effective_db_model = db_model_raw
+
+        if cls._instance is not None:
+            if cls._instance._ai_provider_name != db_provider or cls._instance._ai_model_name != effective_db_model:
+                logger.info("ai_settings_changed_refreshing_factory",
+                            old_p=cls._instance._ai_provider_name, new_p=db_provider,
+                            old_m=cls._instance._ai_model_name, new_m=effective_db_model)
+                # Await cleanup of the old instance's async resources (ccxt session,
+                # telegram client) BEFORE replacing the singleton, so we never leak
+                # aiohttp/Bybit connections on AI provider swap.
+                old_instance = cls._instance
+                cls._instance = None
+                try:
+                    await old_instance.close()
+                except Exception as e:
+                    logger.warning("factory_refresh_close_failed", error=str(e))
+
         if cls._instance is None:
             cls._instance = ServiceFactory(db)
         
@@ -152,5 +241,5 @@ class ServiceFactory:
             db=db
         )
 
-def create_orchestrator(db: Session) -> MasterOrchestrator:
-    return ServiceFactory.get_orchestrator(db)
+async def create_orchestrator(db: Session) -> MasterOrchestrator:
+    return await ServiceFactory.get_orchestrator(db)

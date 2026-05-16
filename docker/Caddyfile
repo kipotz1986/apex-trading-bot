@@ -18,6 +18,12 @@
         reverse_proxy apex-backend:8000
     }
 
+    # Fallback for old/incorrect frontend paths
+    handle /api/ws {
+        rewrite * /ws
+        reverse_proxy apex-backend:8000
+    }
+
     # Security Headers
     header {
         # Enable HSTS

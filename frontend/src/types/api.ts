@@ -28,6 +28,12 @@ export interface BotStatus {
   mode: "LIVE" | "PAPER";
   last_updated: string;
   is_live_enabled: boolean;
+  last_run_at?: string;
+  interval?: number;
+  current_step?: {
+    step: string;
+    symbol: string | null;
+  };
 }
 
 export interface AgentInsights {

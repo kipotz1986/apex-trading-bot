@@ -51,6 +51,7 @@ export const useBotStatus = () => {
       const { data } = await api.get("/bot/status");
       return data;
     },
+    refetchInterval: 10000,
   });
 };
 
@@ -229,6 +230,7 @@ export interface SystemSettingsData {
   maxTotalExposure: number;
   consensusThresholdStrong: number;
   consensusThresholdModerate: number;
+  botIntervalSeconds: number;
   aiProvider: string;
   advancedReasoningEnabled: boolean;
   tradingSymbols: string[];
@@ -238,6 +240,7 @@ export interface SystemSettingsData {
     openai_api_key: string;
     google_api_key: string;
     anthropic_api_key: string;
+    nvidia_api_key: string;
   };
   exchange: {
     name: string;
@@ -287,9 +290,11 @@ export const useUpdateAISettings = () => {
       advancedReasoningEnabled: boolean, 
       provider?: string, 
       model?: string,
+      botIntervalSeconds?: number,
       openai_api_key?: string,
       google_api_key?: string,
-      anthropic_api_key?: string
+      anthropic_api_key?: string,
+      nvidia_api_key?: string
     }) => {
       await api.put("/settings/ai", payload);
     },

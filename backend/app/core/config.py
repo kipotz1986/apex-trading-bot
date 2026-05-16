@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "openai"
     AI_MODEL: str = "gpt-4o"
     AI_API_KEY: str = ""
+    NVIDIA_API_KEY: str = ""
     AI_FALLBACK_PROVIDER: Optional[str] = None
     AI_FALLBACK_MODEL: Optional[str] = None
     AI_FALLBACK_API_KEY: Optional[str] = None
@@ -64,8 +65,9 @@ class Settings(BaseSettings):
     TIMEZONE: str = "Asia/Jakarta"
 
     # === Bot Runner ===
+    BOT_INTERVAL_SECONDS: int = 60
     # Multi-symbol trading: BTC, ETH, SOL by default. CCXT contract format for Bybit perps.
-    TRADING_SYMBOLS: str = "BTC/USDT:USDT,ETH/USDT:USDT,SOL/USDT:USDT"
+    TRADING_SYMBOLS: str = "BTC/USDT:USDT,ETH/USDT:USDT,SOL/USDT:USDT,XRP/USDT:USDT"
 
     def get_symbol_list(self) -> list[str]:
         """Parse symbol string into list, with DB override if available."""

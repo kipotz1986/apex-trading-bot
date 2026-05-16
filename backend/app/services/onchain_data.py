@@ -35,7 +35,7 @@ class OnChainDataService:
         # Base URLs
         self.coingecko_url = "https://api.coingecko.com/api/v3"
         self.blockchain_url = "https://api.blockchain.info"
-        self.etherscan_url = "https://api.etherscan.io/api"
+        self.etherscan_url = "https://api.etherscan.io/v2/api"
         # Solana mainnet public RPC (no API key needed)
         self.solana_rpc_url = "https://api.mainnet-beta.solana.com"
 
@@ -180,6 +180,7 @@ class OnChainDataService:
                     "module": "proxy",
                     "action": "eth_blockNumber",
                     "apikey": self.etherscan_key,
+                    "chainid": "1",
                 }
                 block_response = await client.get(self.etherscan_url, params=params)
                 if block_response.status_code != 200:
@@ -194,6 +195,7 @@ class OnChainDataService:
                     "tag": latest_block,
                     "boolean": "true",
                     "apikey": self.etherscan_key,
+                    "chainid": "1",
                 }
                 tx_response = await client.get(self.etherscan_url, params=tx_params)
                 if tx_response.status_code != 200:
@@ -242,6 +244,7 @@ class OnChainDataService:
                     "module": "gastracker",
                     "action": "gasoracle",
                     "apikey": self.etherscan_key,
+                    "chainid": "1",
                 }
                 from app.services.integration_logger import IntegrationLogger
                 IntegrationLogger.record_request(url=self.etherscan_url, method="GET", body=params)
@@ -314,6 +317,40 @@ class OnChainDataService:
             return result
         except Exception as e:
             logger.error("solana_stats_failed", error=str(e))
+            return result
+
+    # ─── XRPL Public RPC: XRP On-Chain Stats ─────────────────────────
+
+    @log_integration(service_type="DATA_FEED", provider_name="XRPL", endpoint="fee")
+    async def get_xrp_onchain_stats(self) -> Dict[str, Any]:
+        """
+        Ambil statistik on-chain XRP dari XRPL public RPC (free, no key).
+        Returns: current_ledger_size, current_queue_size, median_fee.
+        """
+        result = {
+            "current_ledger_size": 0,
+            "current_queue_size": 0,
+            "median_fee_drops": 0,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                rpc_url = "https://xrplcluster.com"
+                from app.services.integration_logger import IntegrationLogger
+                IntegrationLogger.record_request(url=rpc_url, method="POST", body={"method": "fee"})
+
+                payload = {"method": "fee", "params": [{}]}
+                resp = await client.post(rpc_url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json().get("result", {})
+                    result["current_ledger_size"] = int(data.get("current_ledger_size", 0))
+                    result["current_queue_size"] = int(data.get("current_queue_size", 0))
+                    drops = data.get("drops", {})
+                    result["median_fee_drops"] = int(drops.get("median_fee", 0))
+
+            logger.info("xrp_stats_fetched", ledger_size=result["current_ledger_size"])
+            return result
+        except Exception as e:
+            logger.error("xrp_stats_failed", error=str(e))
             return result
 
     # ─── Aggregated Summary (symbol-aware) ─────────────────────────────
@@ -419,6 +456,27 @@ class OnChainDataService:
                 "tps": tps,
                 "slot_height": sol_stats.get("slot_height", 0),
             })
+
+        elif coin == "XRP":
+            # Alt-friendly conditions
+            if btc_dom > 55:
+                sentiment_score -= 8
+            elif btc_dom < 40:
+                sentiment_score += 8
+                
+            xrp_stats = await self.get_xrp_onchain_stats()
+            ledger_size = xrp_stats.get("current_ledger_size", 0)
+            
+            # XRP network activity: high ledger size = high transaction volume = bullish
+            if ledger_size > 500:
+                sentiment_score += 10
+            elif ledger_size > 100:
+                sentiment_score += 5
+            elif ledger_size < 10:
+                sentiment_score -= 5 # low network activity
+                
+            details.update(xrp_stats)
+            
         else:
             # Unknown coin — use market-wide signals only
             details["note"] = f"No specific on-chain signals available for {coin}, using market-wide data"

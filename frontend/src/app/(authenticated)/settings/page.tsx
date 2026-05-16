@@ -43,7 +43,7 @@ const MODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 }
 
 const MODE_COLORS: Record<string, { bg: string; border: string; text: string; ring: string }> = {
-  emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", ring: "ring-emerald-500/50" },
+  emerald: { bg: "bg-primary/10", border: "border-emerald-500/30", text: "text-primary", ring: "ring-primary/50" },
   blue: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400", ring: "ring-blue-500/50" },
   amber: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400", ring: "ring-amber-500/50" },
   orange: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400", ring: "ring-orange-500/50" },
@@ -132,9 +132,11 @@ export default function SettingsPage() {
           advancedReasoningEnabled: localSettings.advancedReasoningEnabled,
           provider: localSettings.ai.provider,
           model: localSettings.ai.model,
+          botIntervalSeconds: localSettings.botIntervalSeconds,
           openai_api_key: localSettings.ai.openai_api_key,
           google_api_key: localSettings.ai.google_api_key,
-          anthropic_api_key: localSettings.ai.anthropic_api_key
+          anthropic_api_key: localSettings.ai.anthropic_api_key,
+          nvidia_api_key: localSettings.ai.nvidia_api_key
         }),
         updateNotifications.mutateAsync({
           telegram_bot_token: localSettings.notifications?.telegram_bot_token,
@@ -213,8 +215,8 @@ export default function SettingsPage() {
     return (
       <div className="space-y-8 max-w-4xl animate-in fade-in duration-700">
         <div>
-           <h1 className="text-3xl font-bold tracking-tight text-white">System Settings</h1>
-           <p className="text-white/40 text-sm mt-1">Loading system configuration...</p>
+           <h1 className="text-3xl font-bold tracking-tight text-foreground">System Settings</h1>
+           <p className="text-muted-foreground text-sm mt-1">Loading system configuration...</p>
         </div>
       </div>
     )
@@ -224,7 +226,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-8 max-w-4xl animate-in fade-in duration-700">
         <div>
-           <h1 className="text-3xl font-bold tracking-tight text-white">System Settings</h1>
+           <h1 className="text-3xl font-bold tracking-tight text-foreground">System Settings</h1>
            <p className="text-red-500 text-sm mt-1">Error loading settings: {(error as any)?.message || String(error)}</p>
         </div>
       </div>
@@ -234,26 +236,26 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 max-w-4xl animate-in fade-in duration-700">
       <div>
-         <h1 className="text-3xl font-bold tracking-tight text-white">System Settings</h1>
-         <p className="text-white/40 text-sm mt-1">Configure AI parameters, exchange API keys, and notification triggers.</p>
+         <h1 className="text-3xl font-bold tracking-tight text-foreground">System Settings</h1>
+         <p className="text-muted-foreground text-sm mt-1">Configure AI parameters, exchange API keys, and notification triggers.</p>
       </div>
 
       <div className="grid gap-8">
          {/* AI Configuration */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center gap-4">
-               <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <Cpu className="w-5 h-5 text-emerald-500" />
+               <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                  <Cpu className="w-5 h-5 text-primary" />
                </div>
                <div>
-                  <CardTitle className="text-lg text-white">AI Engine</CardTitle>
-                  <CardDescription className="text-white/30">Select the primary model for consensus logic.</CardDescription>
+                  <CardTitle className="text-lg text-foreground">AI Engine</CardTitle>
+                  <CardDescription className="text-muted-foreground/80">Select the primary model for consensus logic.</CardDescription>
                </div>
             </CardHeader>
              <CardContent className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                    <div className="grid gap-2">
-                      <Label className="text-xs text-white/50 uppercase tracking-widest">Primary Model Provider</Label>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-widest">Primary Model Provider</Label>
                       <Select 
                         value={localSettings.ai?.provider} 
                         onValueChange={(val) => setLocalSettings({
@@ -261,18 +263,19 @@ export default function SettingsPage() {
                           ai: { ...localSettings.ai, provider: val, model: "" }
                         })}
                       >
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                        <SelectTrigger className="bg-muted/50 border-border text-foreground">
                           <SelectValue placeholder="Select Provider" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#050B0A] border-white/10 text-white">
+                        <SelectContent className="bg-popover border-border text-foreground">
                           <SelectItem value="openai">OpenAI</SelectItem>
                           <SelectItem value="google">Google Gemini</SelectItem>
                           <SelectItem value="anthropic">Anthropic Claude</SelectItem>
+                          <SelectItem value="nvidia">NVIDIA NIM</SelectItem>
                         </SelectContent>
                       </Select>
                    </div>
                    <div className="grid gap-2">
-                      <Label className="text-xs text-white/50 uppercase tracking-widest">Model Selection</Label>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-widest">Model Selection</Label>
                       <Select 
                         value={localSettings.ai?.model} 
                         onValueChange={(val) => setLocalSettings({
@@ -281,10 +284,10 @@ export default function SettingsPage() {
                         })}
                         disabled={!localSettings.ai?.provider || isLoadingModels}
                       >
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                        <SelectTrigger className="bg-muted/50 border-border text-foreground">
                           <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select Model"} />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#050B0A] border-white/10 text-white">
+                        <SelectContent className="bg-popover border-border text-foreground">
                           {availableModels?.map((model) => (
                             <SelectItem key={model} value={model}>{model}</SelectItem>
                           ))}
@@ -297,63 +300,84 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="grid gap-2">
-                   <Label className="text-xs text-white/50 uppercase tracking-widest">
+                   <Label className="text-xs text-muted-foreground uppercase tracking-widest">
                       {localSettings.ai?.provider?.toUpperCase() || "PROVIDER"} API KEY
                    </Label>
                    <Input 
                       type="password" 
                       placeholder="••••••••••••••••"
-                      className="bg-white/5 border-white/10 text-white"
+                      className="bg-muted/50 border-border text-foreground"
                       value={
                          localSettings.ai?.provider === "openai" ? localSettings.ai.openai_api_key :
                          localSettings.ai?.provider === "google" ? localSettings.ai.google_api_key :
-                         localSettings.ai?.provider === "anthropic" ? localSettings.ai.anthropic_api_key : ""
+                         localSettings.ai?.provider === "anthropic" ? localSettings.ai.anthropic_api_key :
+                         localSettings.ai?.provider === "nvidia" ? localSettings.ai.nvidia_api_key : ""
                       }
                       onChange={(e) => {
                          const provider = localSettings.ai?.provider;
                          if (provider === "openai") setLocalSettings({...localSettings, ai: {...localSettings.ai, openai_api_key: e.target.value}});
                          if (provider === "google") setLocalSettings({...localSettings, ai: {...localSettings.ai, google_api_key: e.target.value}});
                          if (provider === "anthropic") setLocalSettings({...localSettings, ai: {...localSettings.ai, anthropic_api_key: e.target.value}});
+                         if (provider === "nvidia") setLocalSettings({...localSettings, ai: {...localSettings.ai, nvidia_api_key: e.target.value}});
                       }}
                    />
-                   <p className="text-[10px] text-white/20 italic">API keys are stored securely and never exposed in logs.</p>
+                   <p className="text-[10px] text-muted-foreground/60 italic">API keys are stored securely and never exposed in logs.</p>
                 </div>
 
-               <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                  <div className="space-y-1">
-                     <p className="text-sm font-bold text-white">Advanced Reasoning</p>
-                     <p className="text-[10px] text-white/30 uppercase tracking-widest">Use higher-cost models for complex regimes</p>
-                  </div>
-                  <Switch 
-                    checked={localSettings.advancedReasoningEnabled} 
-                    onCheckedChange={(val) => setLocalSettings({...localSettings, advancedReasoningEnabled: val})}
-                  />
-               </div>
+                <div className="pt-4 border-t border-border/50 space-y-4">
+                   <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                         <p className="text-sm font-bold text-foreground">Bot Cycle Interval</p>
+                         <p className="text-[10px] text-muted-foreground/80 uppercase tracking-widest">How often the bot analyzes and trades (seconds)</p>
+                      </div>
+                      <div className="w-24">
+                         <Input 
+                            type="number" 
+                            min="10"
+                            max="3600"
+                            className="bg-muted/50 border-border text-foreground text-right"
+                            value={localSettings.botIntervalSeconds || 60}
+                            onChange={(e) => setLocalSettings({...localSettings, botIntervalSeconds: parseInt(e.target.value) || 60})}
+                         />
+                      </div>
+                   </div>
+
+                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/20 border border-border/50">
+                      <div className="space-y-1">
+                         <p className="text-sm font-bold text-foreground">Advanced Reasoning</p>
+                         <p className="text-[10px] text-muted-foreground/80 uppercase tracking-widest">Use higher-cost models for complex regimes</p>
+                      </div>
+                      <Switch 
+                        checked={localSettings.advancedReasoningEnabled} 
+                        onCheckedChange={(val) => setLocalSettings({...localSettings, advancedReasoningEnabled: val})}
+                      />
+                   </div>
+                </div>
             </CardContent>
          </Card>
 
          {/* Exchange Configuration */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
                <div className="flex flex-row items-center gap-4">
                  <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <Key className="w-5 h-5 text-blue-500" />
                  </div>
                  <div>
-                    <CardTitle className="text-lg text-white">Exchange API</CardTitle>
-                    <CardDescription className="text-white/30">Securely transmit orders to your exchange account.</CardDescription>
+                    <CardTitle className="text-lg text-foreground">Exchange API</CardTitle>
+                    <CardDescription className="text-muted-foreground/80">Securely transmit orders to your exchange account.</CardDescription>
                  </div>
                </div>
-               <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+               <div className="flex bg-muted/50 rounded-lg p-1 border border-border">
                  <button 
                    onClick={() => setActiveTab('demo')}
-                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'demo' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white'}`}
+                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'demo' ? 'bg-blue-500/20 text-blue-400' : 'text-muted-foreground hover:text-foreground'}`}
                  >
                    DEMO
                  </button>
                  <button 
                    onClick={() => setActiveTab('live')}
-                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'live' ? 'bg-red-500/20 text-red-400' : 'text-white/40 hover:text-white'}`}
+                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'live' ? 'bg-red-500/20 text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
                  >
                    LIVE
                  </button>
@@ -376,9 +400,9 @@ export default function SettingsPage() {
                   {/* API Key — uncontrolled, read via ref on save */}
                   <div className="grid gap-2">
                      <div className="flex items-center justify-between">
-                       <Label className="text-xs text-white/50 uppercase tracking-widest">API Key</Label>
+                       <Label className="text-xs text-muted-foreground uppercase tracking-widest">API Key</Label>
                        {exchangeProfiles[activeTab]?.api_key && !exchangeProfiles[activeTab]?.is_placeholder && (
-                         <span className="text-[9px] font-bold text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded uppercase tracking-widest">✓ Stored</span>
+                         <span className="text-[9px] font-bold text-primary/70 bg-primary/10 px-2 py-0.5 rounded uppercase tracking-widest">✓ Stored</span>
                        )}
                        {exchangeProfiles[activeTab]?.is_placeholder && (
                          <span className="text-[9px] font-bold text-red-400/80 bg-red-500/10 px-2 py-0.5 rounded uppercase tracking-widest">⚠ Invalid</span>
@@ -388,7 +412,7 @@ export default function SettingsPage() {
                        ref={apiKeyRef}
                        type="text"
                        placeholder={exchangeProfiles[activeTab]?.api_key && !exchangeProfiles[activeTab]?.is_placeholder ? "Leave blank to keep existing" : "Enter API Key"}
-                       className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                       className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-primary/50"
                        autoComplete="off"
                        spellCheck={false}
                      />
@@ -397,9 +421,9 @@ export default function SettingsPage() {
                   {/* API Secret — uncontrolled, read via ref on save */}
                   <div className="grid gap-2">
                      <div className="flex items-center justify-between">
-                       <Label className="text-xs text-white/50 uppercase tracking-widest">API Secret</Label>
+                       <Label className="text-xs text-muted-foreground uppercase tracking-widest">API Secret</Label>
                        {exchangeProfiles[activeTab]?.api_key && !exchangeProfiles[activeTab]?.is_placeholder && (
-                         <span className="text-[9px] font-bold text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded uppercase tracking-widest">✓ Stored</span>
+                         <span className="text-[9px] font-bold text-primary/70 bg-primary/10 px-2 py-0.5 rounded uppercase tracking-widest">✓ Stored</span>
                        )}
                        {exchangeProfiles[activeTab]?.is_placeholder && (
                          <span className="text-[9px] font-bold text-red-400/80 bg-red-500/10 px-2 py-0.5 rounded uppercase tracking-widest">⚠ Invalid</span>
@@ -409,7 +433,7 @@ export default function SettingsPage() {
                        ref={apiSecretRef}
                        type="password"
                        placeholder={exchangeProfiles[activeTab]?.api_key && !exchangeProfiles[activeTab]?.is_placeholder ? "Leave blank to keep existing" : "Enter API Secret"}
-                       className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                       className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-primary/50"
                        autoComplete="new-password"
                        spellCheck={false}
                      />
@@ -417,28 +441,28 @@ export default function SettingsPage() {
 
                   {/* Base URL */}
                   <div className="grid gap-2 md:col-span-2">
-                     <Label className="text-xs text-white/50 uppercase tracking-widest">Base URL (Optional)</Label>
+                     <Label className="text-xs text-muted-foreground uppercase tracking-widest">Base URL (Optional)</Label>
                      <input
                        ref={baseUrlRef}
                        type="text"
                        defaultValue={exchangeProfiles[activeTab]?.base_url || ""}
                        placeholder={activeTab === 'demo' ? "https://api-demo.bybit.com" : "https://api.bybit.com (or leave blank for mainnet)"}
-                       className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                       className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:ring-1 focus:ring-primary/50"
                      />
-                     <p className="text-[9px] text-white/20">
+                     <p className="text-[9px] text-muted-foreground/60">
                        {activeTab === 'demo' ? "Bybit Demo Trading endpoint: https://api-demo.bybit.com" : "Bybit Mainnet: leave blank or enter https://api.bybit.com"}
                      </p>
                   </div>
                </div>
-               <div className="flex items-center justify-between pt-4 border-t border-white/5">
+               <div className="flex items-center justify-between pt-4 border-t border-border/50">
                   <div className="text-xs font-bold flex items-center gap-2">
                     {exchangeProfiles[activeTab]?.is_active ? (
-                      <span className="text-emerald-400 flex items-center gap-2">
+                      <span className="text-primary flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                         Active Profile
                       </span>
                     ) : (
-                      <span className="text-white/40">Inactive</span>
+                      <span className="text-muted-foreground">Inactive</span>
                     )}
                   </div>
                   <div className="flex gap-3">
@@ -446,14 +470,14 @@ export default function SettingsPage() {
                       variant="outline" 
                       onClick={handleTestConnection}
                       disabled={testConn.isPending}
-                      className="text-xs font-bold border-white/10 text-white/70 hover:text-white"
+                      className="text-xs font-bold border-border text-foreground/90 hover:text-foreground"
                     >
                       {testConn.isPending ? "Testing..." : "Test Connection"}
                     </Button>
                     <Button 
                       onClick={handleSaveProfile}
                       disabled={updateProfile.isPending}
-                      className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-[0_0_15px_rgba(37,99,235,0.2)]"
+                      className="bg-blue-600 hover:bg-blue-500 text-foreground text-xs font-bold shadow-[0_0_15px_rgba(37,99,235,0.2)]"
                     >
                       {updateProfile.isPending ? "Saving..." : "Save Credentials"}
                     </Button>
@@ -463,21 +487,21 @@ export default function SettingsPage() {
          </Card>
 
          {/* Bot Mode Picker — replaces individual risk-parameter inputs */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center gap-4">
                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
                   <Sliders className="w-5 h-5 text-red-500" />
                </div>
                <div>
-                  <CardTitle className="text-lg text-white">Bot Mode</CardTitle>
-                  <CardDescription className="text-white/30">
+                  <CardTitle className="text-lg text-foreground">Bot Mode</CardTitle>
+                  <CardDescription className="text-muted-foreground/80">
                      Pilih profil risiko bot — semakin agresif, semakin sering trade dan semakin besar potensi profit & loss.
                   </CardDescription>
                </div>
             </CardHeader>
             <CardContent className="space-y-3">
                {!modeData ? (
-                  <div className="p-6 text-center text-[10px] text-white/30 uppercase tracking-widest">Loading modes...</div>
+                  <div className="p-6 text-center text-[10px] text-muted-foreground/80 uppercase tracking-widest">Loading modes...</div>
                ) : (
                   modeData.profiles.map((profile: ModeProfile) => {
                      const isActive = profile.slug === modeData.active_slug
@@ -488,8 +512,8 @@ export default function SettingsPage() {
                            key={profile.slug}
                            onClick={() => handleSelectMode(profile.slug)}
                            disabled={setMode.isPending}
-                           className={`w-full text-left rounded-xl border-2 p-4 transition-all hover:bg-white/[0.02] disabled:opacity-50 ${
-                              isActive ? `${color.border} ${color.bg} ring-1 ${color.ring}` : "border-white/5 bg-transparent"
+                           className={`w-full text-left rounded-xl border-2 p-4 transition-all hover:bg-muted/20 disabled:opacity-50 ${
+                              isActive ? `${color.border} ${color.bg} ring-1 ${color.ring}` : "border-border/50 bg-transparent"
                            }`}
                         >
                            <div className="flex items-start gap-4">
@@ -498,10 +522,10 @@ export default function SettingsPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className={`text-sm font-bold ${isActive ? color.text : "text-white"}`}>
+                                    <span className={`text-sm font-bold ${isActive ? color.text : "text-foreground"}`}>
                                        {profile.name}
                                     </span>
-                                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">
+                                    <span className="text-[9px] font-bold text-muted-foreground/80 uppercase tracking-widest">
                                        Level {profile.risk_level}/5
                                     </span>
                                     {isActive && (
@@ -510,11 +534,11 @@ export default function SettingsPage() {
                                        </span>
                                     )}
                                  </div>
-                                 <p className={`text-xs leading-relaxed ${isActive ? "text-white/70" : "text-white/40"}`}>
+                                 <p className={`text-xs leading-relaxed ${isActive ? "text-foreground/90" : "text-muted-foreground"}`}>
                                     {profile.tagline}
                                  </p>
                                  {isActive && (
-                                    <p className="text-[10px] text-white/40 leading-relaxed mt-2 italic">
+                                    <p className="text-[10px] text-muted-foreground leading-relaxed mt-2 italic">
                                        {profile.description}
                                     </p>
                                  )}
@@ -524,28 +548,28 @@ export default function SettingsPage() {
                      )
                   })
                )}
-               <p className="text-[10px] text-white/30 italic pt-2 border-t border-white/5">
-                 💡 Detail parameter dari mode yang aktif bisa dilihat di halaman <b className="text-emerald-500/60">AI Agents</b>.
+               <p className="text-[10px] text-muted-foreground/80 italic pt-2 border-t border-border/50">
+                 💡 Detail parameter dari mode yang aktif bisa dilihat di halaman <b className="text-primary/60">AI Agents</b>.
                </p>
             </CardContent>
          </Card>
 
          {/* Trading Symbols */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center gap-4">
                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <Coins className="w-5 h-5 text-amber-500" />
                </div>
                <div>
-                  <CardTitle className="text-lg text-white">Trading Symbols</CardTitle>
-                  <CardDescription className="text-white/30">
+                  <CardTitle className="text-lg text-foreground">Trading Symbols</CardTitle>
+                  <CardDescription className="text-muted-foreground/80">
                      Pilih koin mana saja yang akan dianalisa dan diperdagangkan oleh bot tiap cycle.
                   </CardDescription>
                </div>
             </CardHeader>
             <CardContent className="space-y-3">
                {!symbolData ? (
-                  <div className="p-6 text-center text-[10px] text-white/30 uppercase tracking-widest">Loading symbols...</div>
+                  <div className="p-6 text-center text-[10px] text-muted-foreground/80 uppercase tracking-widest">Loading symbols...</div>
                ) : (
                   symbolData.supported.map((sym) => {
                      const isActive = symbolData.active.includes(sym.symbol)
@@ -554,51 +578,51 @@ export default function SettingsPage() {
                            key={sym.symbol}
                            onClick={() => handleToggleSymbol(sym.symbol)}
                            disabled={updateSymbols.isPending}
-                           className={`w-full text-left rounded-xl border-2 p-4 transition-all hover:bg-white/[0.02] disabled:opacity-50 flex items-center gap-3 ${
-                              isActive ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/5 bg-transparent"
+                           className={`w-full text-left rounded-xl border-2 p-4 transition-all hover:bg-muted/20 disabled:opacity-50 flex items-center gap-3 ${
+                              isActive ? "border-primary/30 bg-primary/5" : "border-border/50 bg-transparent"
                            }`}
                         >
                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                             isActive ? "bg-emerald-500 border-emerald-500" : "border-white/20"
+                             isActive ? "bg-primary border-primary" : "border-white/20"
                            }`}>
                               {isActive && <Check className="w-3.5 h-3.5 text-black" />}
                            </div>
                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                 <span className={`text-sm font-bold ${isActive ? "text-emerald-400" : "text-white"}`}>
+                                 <span className={`text-sm font-bold ${isActive ? "text-primary" : "text-foreground"}`}>
                                     {sym.name}
                                  </span>
-                                 <span className="text-[10px] font-mono text-white/30">{sym.ticker}/USDT</span>
+                                 <span className="text-[10px] font-mono text-muted-foreground/80">{sym.ticker}/USDT</span>
                               </div>
-                              <p className="text-[10px] text-white/40 leading-relaxed mt-0.5">
-                                 On-chain source: <span className="text-white/60">{sym.onchain_source}</span>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5">
+                                 On-chain source: <span className="text-foreground/80">{sym.onchain_source}</span>
                               </p>
                            </div>
                         </button>
                      )
                   })
                )}
-               <p className="text-[10px] text-white/30 italic pt-2 border-t border-white/5">
-                 ℹ️ Bot akan iterasi tiap simbol pada setiap cycle (~60 detik). Lebih banyak simbol = lebih banyak peluang trade.
+               <p className="text-[10px] text-muted-foreground/80 italic pt-2 border-t border-border/50">
+                 ℹ️ Bot akan iterasi tiap simbol pada setiap cycle (~{localSettings.botIntervalSeconds || 60} detik). Lebih banyak simbol = lebih banyak peluang trade.
                </p>
             </CardContent>
          </Card>
 
          {/* Notifications Configuration */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center gap-4">
                <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
                   <Bell className="w-5 h-5 text-purple-500" />
                </div>
                <div>
-                  <CardTitle className="text-lg text-white">Notifications</CardTitle>
-                  <CardDescription className="text-white/30">Connect Telegram to receive real-time alerts and reports.</CardDescription>
+                  <CardTitle className="text-lg text-foreground">Notifications</CardTitle>
+                  <CardDescription className="text-muted-foreground/80">Connect Telegram to receive real-time alerts and reports.</CardDescription>
                </div>
             </CardHeader>
             <CardContent className="space-y-6">
                <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                     <Label className="text-[10px] text-white/50 uppercase tracking-widest">Telegram Bot Token</Label>
+                     <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">Telegram Bot Token</Label>
                      <Input 
                         type="password" 
                         placeholder={localSettings.notifications?.telegram_bot_token === "****" ? "••••••••••••••••" : "Enter Bot Token"}
@@ -607,11 +631,11 @@ export default function SettingsPage() {
                           ...localSettings, 
                           notifications: { ...localSettings.notifications, telegram_bot_token: e.target.value }
                         })}
-                        className="bg-white/5 border-white/10 text-white font-mono" 
+                        className="bg-muted/50 border-border text-foreground font-mono" 
                      />
                   </div>
                   <div className="space-y-2">
-                     <Label className="text-[10px] text-white/50 uppercase tracking-widest">Telegram Chat ID</Label>
+                     <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">Telegram Chat ID</Label>
                      <Input 
                         type="text" 
                         placeholder="Enter Chat ID"
@@ -620,13 +644,13 @@ export default function SettingsPage() {
                           ...localSettings, 
                           notifications: { ...localSettings.notifications, telegram_chat_id: e.target.value }
                         })}
-                        className="bg-white/5 border-white/10 text-white font-mono" 
+                        className="bg-muted/50 border-border text-foreground font-mono" 
                      />
                   </div>
                </div>
                <div className="flex items-center justify-between pt-2">
-                 <p className="text-[10px] text-white/20 italic">
-                   Get your Chat ID by messaging <code className="text-emerald-500/50">@userinfobot</code> on Telegram.
+                 <p className="text-[10px] text-muted-foreground/60 italic">
+                   Get your Chat ID by messaging <code className="text-primary/50">@userinfobot</code> on Telegram.
                  </p>
                  <Button
                    variant="outline"
@@ -654,21 +678,21 @@ export default function SettingsPage() {
          </Card>
 
          {/* Audit Logs */}
-         <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+         <Card className="glass-card backdrop-blur-md">
             <CardHeader className="flex flex-row items-center gap-4">
                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <History className="w-5 h-5 text-amber-500" />
                </div>
                <div>
-                  <CardTitle className="text-lg text-white">Security Audit Log</CardTitle>
-                  <CardDescription className="text-white/30">Recent administrative actions and configuration changes.</CardDescription>
+                  <CardTitle className="text-lg text-foreground">Security Audit Log</CardTitle>
+                  <CardDescription className="text-muted-foreground/80">Recent administrative actions and configuration changes.</CardDescription>
                </div>
             </CardHeader>
             <CardContent className="p-0">
                <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                      <thead>
-                        <tr className="border-b border-white/5 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                        <tr className="border-b border-border/50 text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">
                            <th className="px-6 py-3">Timestamp</th>
                            <th className="px-6 py-3">Action</th>
                            <th className="px-6 py-3">User</th>
@@ -677,20 +701,20 @@ export default function SettingsPage() {
                      </thead>
                      <tbody className="divide-y divide-white/[0.02]">
                         {auditLogs?.map((log) => (
-                           <tr key={log.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-3 text-[10px] text-white/40 font-mono">
+                           <tr key={log.id} className="hover:bg-muted/10 transition-colors">
+                              <td className="px-6 py-3 text-[10px] text-muted-foreground font-mono">
                                  {new Date(log.timestamp).toLocaleString(typeof navigator !== "undefined" ? navigator.language : undefined)}
                               </td>
                               <td className="px-6 py-3">
-                                 <span className="text-[10px] font-bold text-white/60">{log.action.replace('settings_update_', '').toUpperCase()}</span>
+                                 <span className="text-[10px] font-bold text-foreground/80">{log.action.replace('settings_update_', '').toUpperCase()}</span>
                               </td>
-                              <td className="px-6 py-3 text-[10px] text-white/40">{log.user_id}</td>
-                              <td className="px-6 py-3 text-[10px] text-white/20 font-mono">{log.ip_address || "N/A"}</td>
+                              <td className="px-6 py-3 text-[10px] text-muted-foreground">{log.user_id}</td>
+                              <td className="px-6 py-3 text-[10px] text-muted-foreground/60 font-mono">{log.ip_address || "N/A"}</td>
                            </tr>
                         ))}
                         {(!auditLogs || auditLogs.length === 0) && (
                            <tr>
-                              <td colSpan={4} className="px-6 py-8 text-center text-[10px] text-white/20 uppercase tracking-widest">
+                              <td colSpan={4} className="px-6 py-8 text-center text-[10px] text-muted-foreground/60 uppercase tracking-widest">
                                  No recent activity
                               </td>
                            </tr>
@@ -706,14 +730,14 @@ export default function SettingsPage() {
          <Button 
             variant="ghost" 
             onClick={handleDiscard}
-            className="text-white/40 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
          >
             Discard Changes
          </Button>
          <Button 
             onClick={handleSave}
             disabled={updateAI.isPending || updateNotifications.isPending}
-            className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+            className="glass-button text-primary hover:text-primary text-black font-bold shadow-[0_0_20px_rgba(16,185,129,0.2)]"
          >
             {updateAI.isPending || updateNotifications.isPending ? "Saving..." : "Save System Configuration"}
          </Button>

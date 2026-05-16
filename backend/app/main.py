@@ -18,10 +18,11 @@ async def lifespan(app: FastAPI):
     from app.db.init_timescale import init_timescale_db
     from app.services.bot_runner import bot_runner
     from app.services.market_stream import market_stream
-    
+    from app.core.factory import ServiceFactory
+
     # Run DB init
     init_timescale_db()
-    
+
     # Enforce Encryption Key and validate it is a proper Fernet key
     if not settings.ENCRYPTION_KEY:
         logger.error("startup_failed_missing_encryption_key")
@@ -35,14 +36,33 @@ async def lifespan(app: FastAPI):
     # Start background services
     await bot_runner.start()
     await market_stream.start()
-    
+
     logger.info("application_startup_complete",
                 env=settings.APP_ENV,
                 log_level=settings.LOG_LEVEL,
                 timezone=settings.TIMEZONE)
-    yield
-    # Shutdown
-    logger.info("application_shutdown_complete")
+
+    try:
+        yield
+    finally:
+        # Shutdown — must run inside lifespan because @app.on_event("shutdown")
+        # is unreliable when a lifespan handler is registered. Order matters:
+        # 1) stop loops that may issue new exchange calls, 2) then close shared
+        # ccxt/aiohttp sessions, so we don't leak "Unclosed client session".
+        logger.info("application_shutdown_initiated")
+        try:
+            await bot_runner.stop()
+        except Exception as e:
+            logger.warning("bot_runner_stop_failed", error=str(e))
+        try:
+            await market_stream.stop()
+        except Exception as e:
+            logger.warning("market_stream_stop_failed", error=str(e))
+        try:
+            await ServiceFactory.shutdown()
+        except Exception as e:
+            logger.warning("service_factory_shutdown_failed", error=str(e))
+        logger.info("application_shutdown_complete")
 
 app = FastAPI(
     title="APEX Trading Bot API",
@@ -77,19 +97,6 @@ app.include_router(bot.router, prefix="/api/bot", tags=["Bot Control"])
 app.include_router(api_settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(agents.router, prefix="/api/agents", tags=["AI Agents"])
 app.include_router(websocket.router, tags=["Websocket"])
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    from app.services.bot_runner import bot_runner
-    from app.services.market_stream import market_stream
-    logger.info("application_shutdown_initiated")
-    # Stop the trading loop
-    await bot_runner.stop()
-    # Stop market data streaming
-    await market_stream.stop()
-    # Clean up any resources
-    # Positions are intentionally NOT closed here.
-    logger.info("application_shutdown_complete")
 
 @app.get("/")
 async def root():

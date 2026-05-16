@@ -7,10 +7,12 @@ dan memvalidasi risiko untuk menghasilkan keputusan trading final.
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from app.core.ai_provider import AIProvider
 from app.core.logging import get_logger
+from app.api.websocket import broadcast_updates
 from app.agents.technical import TechnicalAnalystAgent
 from app.agents.fundamental import FundamentalAnalystAgent
 from app.agents.sentiment import SentimentAnalystAgent
@@ -26,9 +28,26 @@ from app.services.execution import ExecutionEngine
 from app.services.pre_trade_validator import PreTradeValidator
 from app.services.learning.state_space import StateSpace
 from app.services.learning.pattern_memory import PatternMemory
+from app.services.mode_profile import get_active_profile, DEFAULT_PROFILE_SLUG, MODE_PROFILES
 from app.models.system_settings import SystemSettings
+from app.models.order import Order
 
 logger = get_logger(__name__)
+
+
+# ATR-based SL/TP multipliers per profile. Tuned to give a favourable R:R
+# (winners on average bigger than losers) so the strategy survives a
+# 35-45% win rate. Without these the bot opens trades with NO exit plan,
+# which is the dominant cause of profit factor < 1.
+PROFILE_SL_TP: Dict[str, Dict[str, Any]] = {
+    "conservative":    {"sl_mult": 1.5, "tp_mults": [1.5, 3.0]},
+    "balanced":        {"sl_mult": 2.0, "tp_mults": [2.0, 4.0, 6.0]},
+    "aggressive":      {"sl_mult": 2.0, "tp_mults": [3.0, 5.0, 8.0]},
+    "very_aggressive": {"sl_mult": 2.5, "tp_mults": [3.0, 6.0, 10.0]},
+    "yolo":            {"sl_mult": 3.0, "tp_mults": [4.0, 8.0, 15.0]},
+}
+# Fallback ATR if technical agent didn't compute one: 2% of entry price.
+ATR_FALLBACK_PCT = 0.02
 
 
 class MasterOrchestrator:
@@ -75,6 +94,68 @@ class MasterOrchestrator:
             # Fallback jika belum ada (akan dibuat di T-5.3)
             self.judge_prompt = "You are a senior trading strategist arbitrating conflicting signals."
 
+    def _extract_atr(self, agent_signals: Dict[str, AgentSignal]) -> Optional[float]:
+        """Pull ATR from technical agent's per-TF indicators. Prefers 1h, falls back to any available TF."""
+        tech = agent_signals.get("technical") if agent_signals else None
+        if not tech or not getattr(tech, "metadata", None):
+            return None
+        indicators = tech.metadata.get("indicators") if isinstance(tech.metadata, dict) else None
+        if not indicators or not isinstance(indicators, dict):
+            return None
+        for tf in ("1h", "4h", "15m", "5m", "1m"):
+            tf_ind = indicators.get(tf)
+            if isinstance(tf_ind, dict) and tf_ind.get("atr"):
+                try:
+                    return float(tf_ind["atr"])
+                except (TypeError, ValueError):
+                    continue
+        # last-resort: any timeframe with an ATR
+        for tf_ind in indicators.values():
+            if isinstance(tf_ind, dict) and tf_ind.get("atr"):
+                try:
+                    return float(tf_ind["atr"])
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    def _compute_atr_sl_tp(
+        self,
+        side: str,
+        entry_price: float,
+        agent_signals: Dict[str, AgentSignal],
+        profile_slug: str,
+    ) -> Dict[str, Any]:
+        """
+        Build default ATR-based stop_loss + take_profit ladder, profile-aware.
+        Returns {"stop_loss": float, "take_profit": [float, ...]}.
+        Used whenever upstream (debate protocol) didn't already provide them — which
+        is the majority of trades.
+        """
+        if entry_price <= 0 or side not in ("BUY", "SELL"):
+            return {"stop_loss": None, "take_profit": []}
+
+        atr = self._extract_atr(agent_signals)
+        if atr is None or atr <= 0:
+            atr = entry_price * ATR_FALLBACK_PCT
+
+        mults = PROFILE_SL_TP.get(profile_slug, PROFILE_SL_TP["balanced"])
+        sl_distance = atr * float(mults["sl_mult"])
+        tp_distances = [atr * float(m) for m in mults["tp_mults"]]
+
+        # Price precision: 2 decimals for spot-priced majors; fine enough for SL/TP triggers.
+        if side == "BUY":
+            sl = entry_price - sl_distance
+            tps = [entry_price + d for d in tp_distances]
+        else:  # SELL
+            sl = entry_price + sl_distance
+            tps = [entry_price - d for d in tp_distances]
+
+        # Guard against negative / zero TPs (e.g. tiny entry price with huge ATR)
+        tps = [round(t, 4) for t in tps if t > 0]
+        sl = round(sl, 4) if sl > 0 else None
+
+        return {"stop_loss": sl, "take_profit": tps}
+
     async def decide(
         self,
         symbol: str,
@@ -110,6 +191,8 @@ class MasterOrchestrator:
             
             if use_advanced:
                 logger.info("advanced_reasoning_activated", regime=regime_data.get("regime"))
+            
+            await broadcast_updates("bot_progress", {"step": "analyzing_agents", "symbol": symbol})
 
             # 1. Kumpulkan sinyal dari analis secara paralel
             # Catatan: Risk Manager dieksekusi terakhir setelah ada target trade
@@ -157,6 +240,7 @@ class MasterOrchestrator:
             threshold_strong = float(SystemSettings.get_value(self.db, "consensus_threshold_strong", 0.7))
             threshold_moderate = float(SystemSettings.get_value(self.db, "consensus_threshold_moderate", 0.4))
             
+            await broadcast_updates("bot_progress", {"step": "calculating_consensus", "symbol": symbol})
             consensus_result = self.consensus.calculate(agent_signals, custom_thresholds={
                 "strong": threshold_strong,
                 "moderate": threshold_moderate
@@ -166,9 +250,31 @@ class MasterOrchestrator:
             if consensus_result.get("has_conflict") or (threshold_moderate <= abs(consensus_result.get("score", 0)) < threshold_strong):
                 consensus_result = await self._run_debate_protocol(symbol, agent_signals, consensus_result, advanced=use_advanced)
 
-            # Aggressive: default 20% per trade if no DB override
-            base_risk_pct = float(SystemSettings.get_value(self.db, "max_position_size", "20.0")) / 100.0
-            consensus_result["proposed_size"] = max(portfolio.total_equity * base_risk_pct, 10.0) # minimum $10
+            # Sizing — fall back to the ACTIVE profile's max_position_size rather than a
+            # hardcoded aggressive 20%, so Conservative users don't get over-sized trades.
+            try:
+                active_profile = get_active_profile(self.db) if self.db is not None else MODE_PROFILES[DEFAULT_PROFILE_SLUG]
+            except Exception:
+                active_profile = MODE_PROFILES[DEFAULT_PROFILE_SLUG]
+            profile_params = active_profile.get("params", {})
+            profile_max_pos = profile_params.get("max_position_size", "20.0")
+            profile_max_lev = int(profile_params.get("max_leverage", "15"))
+
+            base_risk_pct = float(SystemSettings.get_value(self.db, "max_position_size", profile_max_pos)) / 100.0
+
+            # Confidence-weighted sizing: scale proposed size by consensus confidence so
+            # weak-conviction trades take smaller positions than high-conviction ones.
+            # Floor at 0.3 so trades just above the entry threshold still get meaningful size.
+            conf = float(consensus_result.get("confidence", 0.0))
+            size_multiplier = min(max(conf, 0.3), 1.0)
+            consensus_result["proposed_size"] = max(
+                portfolio.total_equity * base_risk_pct * size_multiplier,
+                10.0,
+            )  # minimum $10
+
+            # Seed leverage from the active profile so it isn't stuck at 1× later when
+            # consensus_result has no leverage field. Risk manager will cap it per-trade.
+            consensus_result.setdefault("leverage", profile_max_lev)
 
             # Apply Regime Strategy parameters on final consensus (after debate).
             # Pass user_threshold (moderate) so regime floor respects user settings.
@@ -215,6 +321,143 @@ class MasterOrchestrator:
             # Konversi consensus action ke side
             side = "BUY" if "LONG" in consensus_result["action"] else "SELL" if "SHORT" in consensus_result["action"] else "NEUTRAL"
             
+            # --- POSITIVE REVERSAL / COURAGE TO CLOSE LOGIC ---
+            # Collect ALL open positions for this symbol (not just the first one)
+            open_positions_for_symbol = [p for p in portfolio.open_positions if p.symbol == symbol]
+            
+            if open_positions_for_symbol:
+                should_close = False
+                close_reason = ""
+                # Use the dominant side (most positions) for reversal logic
+                long_positions = [p for p in open_positions_for_symbol if p.side in ("LONG", "BUY")]
+                short_positions = [p for p in open_positions_for_symbol if p.side in ("SHORT", "SELL")]
+                dominant_side = "LONG" if len(long_positions) >= len(short_positions) else "SHORT"
+                positions_to_close = long_positions if dominant_side == "LONG" else short_positions
+                
+                # 1. Direct Reversal (Signal is completely opposite)
+                if (dominant_side == "LONG" and side == "SELL") or (dominant_side == "SHORT" and side == "BUY"):
+                    should_close = True
+                    close_reason = f"Trend Reversal (New Signal: {side}, Open: {dominant_side}, Positions: {len(positions_to_close)})"
+                
+                # 2. Weakening Momentum (Signal is HOLD, but score leans against the open position).
+                # NOTE: when consensus action is HOLD, the score is bounded by ±threshold_moderate,
+                # so the weakening threshold MUST be smaller than threshold_moderate or the branch
+                # is unreachable. Use 75% of the entry threshold as the early-warning floor.
+                elif side == "NEUTRAL":
+                    score = consensus_result.get("score", 0.0)
+                    weakening_threshold = threshold_moderate * 0.75
+
+                    if dominant_side == "LONG" and score < -weakening_threshold:
+                        should_close = True
+                        close_reason = f"Momentum Shift Bearish (Score: {score:.2f} < -{weakening_threshold:.2f}, Positions: {len(positions_to_close)})"
+                    elif dominant_side == "SHORT" and score > weakening_threshold:
+                        should_close = True
+                        close_reason = f"Momentum Shift Bullish (Score: {score:.2f} > {weakening_threshold:.2f}, Positions: {len(positions_to_close)})"
+                
+                # --- PnL-AWARE CLOSE GUARD ---
+                # Don't panic-close positions that are in a minor loss. Require a much
+                # stronger signal (0.9x threshold_moderate) for losing positions within
+                # tolerance so they have room to recover.
+                if should_close and side == "NEUTRAL":
+                    total_unrealized = sum(p.unrealized_pnl for p in positions_to_close)
+                    loss_tolerance_pct = float(SystemSettings.get_value(self.db, "loss_tolerance_pct", "5.0"))
+                    loss_pct = (total_unrealized / portfolio.total_equity * 100) if portfolio.total_equity > 0 else 0
+
+                    if total_unrealized < 0 and loss_pct > -loss_tolerance_pct:
+                        # Position is in loss but within tolerance — require STRONGER signal
+                        strict_threshold = threshold_moderate * 0.9
+                        score = consensus_result.get("score", 0.0)
+                        if dominant_side == "LONG" and score >= -strict_threshold:
+                            should_close = False
+                        elif dominant_side == "SHORT" and score <= strict_threshold:
+                            should_close = False
+                        if not should_close:
+                            logger.info("loss_tolerance_hold", symbol=symbol,
+                                        loss_pct=f"{loss_pct:.2f}%", score=score,
+                                        strict_threshold=strict_threshold)
+
+                # --- MINIMUM HOLD TIME GUARD ---
+                # Don't close recently-opened positions on momentum shift alone.
+                # Direct reversals (BUY→SELL) are always allowed regardless of hold time.
+                if should_close and side == "NEUTRAL":
+                    min_hold_minutes = int(SystemSettings.get_value(self.db, "min_hold_time_minutes", "30"))
+                    newest_order = self.db.query(Order).filter(
+                        Order.symbol == symbol,
+                        Order.status.in_(["OPEN", "FILLED"]),
+                        Order.closed_at == None
+                    ).order_by(Order.created_at.desc()).first()
+
+                    if newest_order and newest_order.created_at:
+                        order_ts = newest_order.created_at
+                        if order_ts.tzinfo is None:
+                            order_ts = order_ts.replace(tzinfo=timezone.utc)
+                        age_minutes = (datetime.now(timezone.utc) - order_ts).total_seconds() / 60
+                        if age_minutes < min_hold_minutes:
+                            should_close = False
+                            logger.info("min_hold_time_guard", symbol=symbol,
+                                        age_minutes=round(age_minutes), min=min_hold_minutes)
+
+                if should_close:
+                    logger.info("orchestrator_closing_positions", symbol=symbol, reason=close_reason, count=len(positions_to_close))
+                    await broadcast_updates("bot_progress", {"step": "finalizing_decision", "symbol": symbol})
+                    
+                    # Close ALL matching positions, not just the first one
+                    closed_count = 0
+                    for pos in positions_to_close:
+                        closed_ok = await self.executor.close_position(symbol, pos.side, pos.size)
+                        if closed_ok:
+                            closed_count += 1
+                        else:
+                            logger.warning("failed_to_close_one_position", symbol=symbol, side=pos.side, size=pos.size)
+                    
+                    if closed_count > 0:
+                        if side == "NEUTRAL":
+                            return TradeDecision(
+                                symbol=symbol, action="HOLD",
+                                confidence=consensus_result["confidence"], consensus_score=consensus_result["score"],
+                                reasoning=f"Proactive Closure: {closed_count}/{len(positions_to_close)} positions closed due to {close_reason}.",
+                                agent_signals=agent_signals, market_regime=regime_data["regime"],
+                                state_vector=state_vec.tolist()
+                            )
+                        consensus_result["reasoning"] += f" | Proactive Closure: {closed_count} prior {dominant_side} positions closed ({close_reason})."
+                    else:
+                        logger.error("failed_to_close_any_position", symbol=symbol)
+                        return TradeDecision(
+                            symbol=symbol, action="HOLD", confidence=0.0, consensus_score=consensus_result["score"],
+                            reasoning=f"BLOCKED: Failed to close existing {dominant_side} positions.",
+                            agent_signals=agent_signals, market_regime=regime_data["regime"], state_vector=state_vec.tolist()
+                        )
+            
+            # --- EXPOSURE RELIEF: Close stale positions when exposure cap is saturated ---
+            # If total exposure exceeds the profile cap and no trade can go through,
+            # proactively close the oldest/smallest position for this symbol to free margin.
+            if side == "NEUTRAL" and open_positions_for_symbol:
+                current_exposure = sum(p.size * p.current_price for p in portfolio.open_positions)
+                exposure_pct = (current_exposure / portfolio.total_equity * 100) if portfolio.total_equity > 0 else 0
+                max_exposure = float(SystemSettings.get_value(self.db, "max_total_exposure", "80.0"))
+                
+                if exposure_pct > max_exposure:
+                    # Close the smallest/oldest position to free capacity
+                    # Prefer closing profitable positions first (take profit to free margin)
+                    # so losing positions have room to recover.
+                    profitable = [p for p in open_positions_for_symbol if p.unrealized_pnl > 0]
+                    if profitable:
+                        stale_pos = min(profitable, key=lambda p: p.unrealized_pnl)
+                    else:
+                        stale_pos = min(open_positions_for_symbol, key=lambda p: p.size * p.current_price)
+                    stale_notional = stale_pos.size * stale_pos.current_price
+                    logger.info("exposure_relief_triggered", symbol=symbol, exposure_pct=round(exposure_pct, 1), closing_notional=round(stale_notional, 2))
+                    
+                    closed_ok = await self.executor.close_position(symbol, stale_pos.side, stale_pos.size)
+                    if closed_ok:
+                        return TradeDecision(
+                            symbol=symbol, action="HOLD",
+                            confidence=consensus_result["confidence"], consensus_score=consensus_result["score"],
+                            reasoning=f"Exposure Relief: Closed smallest {stale_pos.side} position (${stale_notional:.0f}) to free margin. Exposure was {exposure_pct:.1f}% > {max_exposure}% cap.",
+                            agent_signals=agent_signals, market_regime=regime_data["regime"],
+                            state_vector=state_vec.tolist()
+                        )
+
             if side == "NEUTRAL":
                 return TradeDecision(
                     symbol=symbol,
@@ -240,25 +483,55 @@ class MasterOrchestrator:
                 except Exception as e:
                     logger.warning("failed_to_fetch_fallback_ticker", symbol=symbol, error=str(e))
 
+            await broadcast_updates("bot_progress", {"step": "evaluating_risk", "symbol": symbol})
             risk_res = await self.risk_manager.analyze(
                 symbol=symbol,
                 side=side,
                 trade_size_usd=consensus_result["proposed_size"],
                 portfolio=portfolio,
                 market_volatility=regime_data["regime"],
-                db=self.db
+                db=self.db,
+                advanced=use_advanced
             )
             
             # Create decision object
+            # Leverage: take the smaller of profile-seeded consensus leverage and the
+            # risk manager's per-trade max — both already respect the active profile.
+            desired_leverage = int(consensus_result.get("leverage", risk_res.max_leverage))
+            final_leverage = max(1, min(desired_leverage, int(risk_res.max_leverage)))
+
+            # MANDATORY SL/TP. Upstream debate protocol may have set these; if not,
+            # synthesize a profile-aware ATR ladder so no trade opens without an exit
+            # plan. This was the #1 cause of profit factor < 1 in prior runs.
+            sl_from_upstream = consensus_result.get("stop_loss")
+            tp_from_upstream = consensus_result.get("take_profit") or []
+            if not sl_from_upstream or not tp_from_upstream:
+                default_levels = self._compute_atr_sl_tp(
+                    side=side,
+                    entry_price=current_price,
+                    agent_signals=agent_signals,
+                    profile_slug=active_profile.get("slug", DEFAULT_PROFILE_SLUG),
+                )
+                if not sl_from_upstream and default_levels["stop_loss"]:
+                    sl_from_upstream = default_levels["stop_loss"]
+                if not tp_from_upstream and default_levels["take_profit"]:
+                    tp_from_upstream = default_levels["take_profit"]
+                logger.info(
+                    "atr_default_sl_tp_applied",
+                    symbol=symbol, side=side, entry=current_price,
+                    sl=sl_from_upstream, tp=tp_from_upstream,
+                    profile=active_profile.get("slug"),
+                )
+
             decision = TradeDecision(
                 symbol=symbol,
                 action=consensus_result["action"],
                 confidence=consensus_result["confidence"],
                 consensus_score=consensus_result["score"],
                 position_size_usd=risk_res.max_position_size_usd,
-                leverage=min(consensus_result.get("leverage", 1), risk_res.max_leverage),
-                stop_loss=consensus_result.get("stop_loss"),
-                take_profit=consensus_result.get("take_profit", []),
+                leverage=final_leverage,
+                stop_loss=sl_from_upstream,
+                take_profit=tp_from_upstream,
                 reasoning=consensus_result["reasoning"],
                 agent_signals=agent_signals,
                 market_regime=regime_data["regime"],
@@ -287,6 +560,7 @@ class MasterOrchestrator:
                 decision.reasoning = f"PRE-TRADE VALIDATION FAILED: {reject_reason}"
                 return decision
 
+            await broadcast_updates("bot_progress", {"step": "finalizing_decision", "symbol": symbol})
             # 6. EXECUTE!
             logger.info("executing_trade", symbol=symbol, side=side, amount=decision.position_size_usd)
 

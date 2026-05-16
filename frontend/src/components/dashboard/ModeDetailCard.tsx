@@ -14,7 +14,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 const COLORS: Record<string, { bg: string; border: string; text: string; gradient: string; ring: string }> = {
-  emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", gradient: "from-emerald-500/20 to-transparent", ring: "ring-emerald-500/50" },
+  emerald: { bg: "bg-primary/10", border: "border-emerald-500/30", text: "text-primary", gradient: "from-emerald-500/20 to-transparent", ring: "ring-primary/50" },
   blue: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400", gradient: "from-blue-500/20 to-transparent", ring: "ring-blue-500/50" },
   amber: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400", gradient: "from-amber-500/20 to-transparent", ring: "ring-amber-500/50" },
   orange: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400", gradient: "from-orange-500/20 to-transparent", ring: "ring-orange-500/50" },
@@ -66,7 +66,7 @@ export function ModeDetailCard() {
 
   if (isLoading || !profile) {
     return (
-      <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
+      <Card className="glass-card backdrop-blur-md">
         <CardContent className="p-6 space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-32 w-full" />
@@ -90,13 +90,13 @@ export function ModeDetailCard() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Active Bot Mode</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Bot Mode</span>
                 <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded", color.bg, color.text)}>
                   Level {profile.risk_level}/5
                 </span>
               </div>
               <CardTitle className={cn("text-2xl font-bold", color.text)}>{profile.name}</CardTitle>
-              <p className="text-xs text-white/60 mt-1 leading-relaxed">{profile.tagline}</p>
+              <p className="text-xs text-foreground/80 mt-1 leading-relaxed">{profile.tagline}</p>
             </div>
           </div>
 
@@ -107,7 +107,7 @@ export function ModeDetailCard() {
               size="sm"
               onClick={() => setShowSelector(!showSelector)}
               className={cn(
-                "text-xs font-bold border-white/10 text-white/70 hover:text-white gap-2",
+                "text-xs font-bold border-border text-foreground/90 hover:text-foreground gap-2",
                 showSelector && cn(color.border, color.text),
               )}
             >
@@ -118,7 +118,7 @@ export function ModeDetailCard() {
               variant="outline"
               size="sm"
               onClick={() => setShowDetails(!showDetails)}
-              className="text-xs font-bold border-white/10 text-white/70 hover:text-white gap-2"
+              className="text-xs font-bold border-border text-foreground/90 hover:text-foreground gap-2"
             >
               {showDetails ? "Sembunyikan Detail" : "Lihat Detail"}
               <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", showDetails && "rotate-180")} />
@@ -129,10 +129,10 @@ export function ModeDetailCard() {
 
       <CardContent className="relative space-y-0">
         {/* Plain-language description always visible */}
-        <div className={cn("p-4 rounded-xl border", "bg-white/[0.02]", "border-white/5")}>
+        <div className={cn("p-4 rounded-xl border", "bg-muted/20", "border-border/50")}>
           <div className="flex gap-3">
-            <Info className="w-4 h-4 text-white/30 shrink-0 mt-0.5" />
-            <p className="text-xs text-white/70 leading-relaxed">{profile.description}</p>
+            <Info className="w-4 h-4 text-muted-foreground/80 shrink-0 mt-0.5" />
+            <p className="text-xs text-foreground/90 leading-relaxed">{profile.description}</p>
           </div>
         </div>
 
@@ -145,7 +145,7 @@ export function ModeDetailCard() {
         >
           <div className="overflow-hidden">
             <div className="space-y-2 pt-2">
-              <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Pilih Bot Mode</h3>
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Pilih Bot Mode</h3>
               {modeData?.profiles.map((p: ModeProfile) => {
                 const isActive = p.slug === profile.slug
                 const PIcon = ICONS[p.icon] || Shield
@@ -156,8 +156,8 @@ export function ModeDetailCard() {
                     onClick={() => handleSelectMode(p.slug)}
                     disabled={setMode.isPending}
                     className={cn(
-                      "w-full text-left rounded-xl border-2 p-3 transition-all hover:bg-white/[0.03] disabled:opacity-50 disabled:cursor-not-allowed",
-                      isActive ? cn(pColor.border, pColor.bg, "ring-1", pColor.ring) : "border-white/5 bg-transparent",
+                      "w-full text-left rounded-xl border-2 p-3 transition-all hover:bg-muted/30 disabled:opacity-50 disabled:cursor-not-allowed",
+                      isActive ? cn(pColor.border, pColor.bg, "ring-1", pColor.ring) : "border-border/50 bg-transparent",
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -166,10 +166,10 @@ export function ModeDetailCard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={cn("text-sm font-bold", isActive ? pColor.text : "text-white")}>
+                          <span className={cn("text-sm font-bold", isActive ? pColor.text : "text-foreground")}>
                             {p.name}
                           </span>
-                          <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">
+                          <span className="text-[9px] font-bold text-muted-foreground/80 uppercase tracking-widest">
                             L{p.risk_level}/5
                           </span>
                           {isActive && (
@@ -178,10 +178,10 @@ export function ModeDetailCard() {
                             </span>
                           )}
                           {setMode.isPending && setMode.variables === p.slug && (
-                            <Loader2 className="w-3 h-3 animate-spin text-white/50" />
+                            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
                           )}
                         </div>
-                        <p className={cn("text-[11px] leading-relaxed", isActive ? "text-white/70" : "text-white/40")}>
+                        <p className={cn("text-[11px] leading-relaxed", isActive ? "text-foreground/90" : "text-muted-foreground")}>
                           {p.tagline}
                         </p>
                       </div>
@@ -202,27 +202,27 @@ export function ModeDetailCard() {
         >
           <div className="overflow-hidden">
             <div className="pt-2">
-              <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Parameter Detail</h3>
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Parameter Detail</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 {profile.param_details.map((param) => (
                   <div
                     key={param.key}
-                    className="p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors"
+                    className="p-3 rounded-lg bg-muted/20 border border-border/50 hover:border-border transition-colors"
                   >
                     <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                         {param.label}
                       </span>
                       <span className={cn("text-base font-bold font-mono", color.text)}>
                         {formatValue(param.value, param.unit)}
                       </span>
                     </div>
-                    <p className="text-[10px] text-white/40 leading-relaxed">{param.explanation}</p>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">{param.explanation}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-white/30 italic pt-3 mt-3 border-t border-white/5">
-                💡 Mode bisa diubah dari tombol <b className="text-white/50">Ubah Mode</b> di atas, atau di halaman <b className="text-white/50">Settings → Bot Mode</b>.
+              <p className="text-[10px] text-muted-foreground/80 italic pt-3 mt-3 border-t border-border/50">
+                💡 Mode bisa diubah dari tombol <b className="text-muted-foreground">Ubah Mode</b> di atas, atau di halaman <b className="text-muted-foreground">Settings → Bot Mode</b>.
               </p>
             </div>
           </div>

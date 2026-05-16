@@ -37,7 +37,7 @@ export function OverviewCards() {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="bg-white/5 border-white/5 backdrop-blur-sm">
+          <Card key={i} className="bg-muted/50 border-border/50 backdrop-blur-sm">
             <CardContent className="p-6 space-y-4">
               <Skeleton className="h-10 w-10 rounded-xl" />
               <div className="space-y-2">
@@ -98,26 +98,26 @@ export function OverviewCards() {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, i) => (
-        <Card key={i} className="bg-white/5 border-white/5 backdrop-blur-sm hover:border-emerald-500/20 transition-all duration-300 group">
+        <Card key={i} className="bg-muted/50 border-border/50 backdrop-blur-sm hover:border-primary/20 transition-all duration-300 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className={`p-2 rounded-xl bg-${stat.color}-500/10 border border-${stat.color}-500/20 group-hover:scale-110 transition-transform`}>
                 <stat.icon className={`w-5 h-5 text-${stat.color}-500`} />
               </div>
-              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} text-[10px] font-bold uppercase tracking-wider`}>
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-500'} text-[10px] font-bold uppercase tracking-wider`}>
                 {stat.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {stat.change}
               </div>
             </div>
             
             <div className="space-y-1">
-              <h3 className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{stat.title}</h3>
-              <p className="text-2xl font-bold text-white tracking-tight leading-none">
+              <h3 className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">{stat.title}</h3>
+              <p className="text-2xl font-bold text-foreground tracking-tight leading-none">
                 {stat.value}
               </p>
             </div>
             
-            <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+            <div className="mt-4 h-1 w-full bg-muted/50 rounded-full overflow-hidden">
                <div
                  className={`h-full bg-${stat.color}-500/40 rounded-full transition-all duration-1000`}
                  style={{ width: `${stat.progress}%` }}

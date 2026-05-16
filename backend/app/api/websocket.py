@@ -14,6 +14,9 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter()
 
+# Global state to track the last bot progress step for mid-process synchronization
+current_bot_step = {"step": "idle", "symbol": None}
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -69,6 +72,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def broadcast_updates(channel: str, data: dict):
     """Utility to broadcast data to a specific channel."""
+    global current_bot_step
+    if channel == "bot_progress":
+        current_bot_step.clear()
+        current_bot_step.update(data)
+        
     await manager.broadcast({
         "channel": channel,
         "data": data,

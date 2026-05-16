@@ -75,6 +75,29 @@ class PaperTradingEngine:
         self.db.refresh(order)
         
         logger.info("paper_order_filled", symbol=symbol, side=side, price=fill_price)
+
+        # --- REAL-TIME WEBSOCKET UPDATE ---
+        try:
+            import asyncio
+            from app.api.websocket import broadcast_updates
+            asyncio.create_task(broadcast_updates("position_update", {
+                "type": "opened",
+                "position": {
+                    "id": order.id,
+                    "symbol": order.symbol,
+                    "side": order.side,
+                    "size": order.requested_amount,
+                    "entry": order.average_filled_price or 0.0,
+                    "current": order.average_filled_price or 0.0,
+                    "leverage": order.leverage,
+                    "pnl": 0.0,
+                    "pnl_percent": 0.0,
+                    "status": "profit"
+                }
+            }))
+        except Exception as we:
+            logger.warning("websocket_broadcast_failed", error=str(we))
+
         return order
 
     async def simulate_closure(self, order: Order, exit_price: float, reason: str = "SL_TP"):
@@ -97,3 +120,15 @@ class PaperTradingEngine:
         
         self.db.commit()
         logger.info("paper_position_closed", symbol=order.symbol, pnl=order.pnl_usd)
+
+        # --- REAL-TIME WEBSOCKET UPDATE ---
+        try:
+            import asyncio
+            from app.api.websocket import broadcast_updates
+            asyncio.create_task(broadcast_updates("position_update", {
+                "type": "closed",
+                "position_id": order.id,
+                "symbol": order.symbol
+            }))
+        except Exception as we:
+            logger.warning("websocket_broadcast_failed", error=str(we))

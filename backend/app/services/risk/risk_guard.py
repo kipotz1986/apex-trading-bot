@@ -59,7 +59,7 @@ class RiskGuard:
     # Built dynamically by exploding pairs into bidirectional lookups.
     _CORRELATION_GROUPS = [
         # Layer 1 majors move together
-        {"BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "BNB/USDT:USDT"},
+        {"BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "XRP/USDT:USDT", "BNB/USDT:USDT"},
     ]
 
     @classmethod

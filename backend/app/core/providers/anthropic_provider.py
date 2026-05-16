@@ -29,9 +29,12 @@ class AnthropicProvider(AIProvider):
         max_tokens: int = 4096,
         json_mode: bool = False,
         agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """Kirim percakapan ke Anthropic Claude."""
         try:
+            target_model = self.get_advanced_model() if advanced else self.model
+
             # Claude mengirim system prompt sebagai parameter terpisah
             system_msg = ""
             anthropic_messages = []
@@ -44,7 +47,7 @@ class AnthropicProvider(AIProvider):
 
             # Setup kwargs
             kwargs = {
-                "model": self.model,
+                "model": target_model,
                 "messages": anthropic_messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
@@ -69,13 +72,14 @@ class AnthropicProvider(AIProvider):
             }
 
             logger.info("anthropic_chat_completed",
-                model=self.model,
-                tokens_used=usage["total_tokens"]
+                model=target_model,
+                tokens_used=usage["total_tokens"],
+                advanced=advanced
             )
 
             return AIResponse(
                 content=response.content[0].text,
-                model=self.model,
+                model=target_model,
                 provider="anthropic",
                 usage=usage,
                 raw_response=response,
@@ -95,6 +99,7 @@ class AnthropicProvider(AIProvider):
         instruction: str,
         json_mode: bool = True,
         agent_name: Optional[str] = None,
+        advanced: bool = False,
     ) -> AIResponse:
         """Shortcut untuk analisis data menggunakan Claude."""
         messages = [
@@ -109,6 +114,7 @@ class AnthropicProvider(AIProvider):
             temperature=0.3,
             json_mode=json_mode,
             agent_name=agent_name,
+            advanced=advanced,
         )
 
     async def embed(self, text: str) -> list[float]:

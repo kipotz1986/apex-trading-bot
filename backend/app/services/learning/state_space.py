@@ -13,12 +13,12 @@ class StateSpace:
     """Service untuk membangun state vector RL."""
 
     # Coin → one-hot index. Adding new coins appends; existing indices stay stable.
-    COIN_INDEX: Dict[str, int] = {"BTC": 0, "ETH": 1, "SOL": 2}
+    COIN_INDEX: Dict[str, int] = {"BTC": 0, "ETH": 1, "SOL": 2, "XRP": 3}
     # Total: 25 base features + len(COIN_INDEX) one-hot symbol features
     BASE_DIM = 25
 
     def __init__(self, feature_dim: int = None):
-        # Auto-size: 25 base + 3 coin slots = 28. Allow override for legacy models.
+        # Auto-size: 25 base + 4 coin slots = 29. Allow override for legacy models.
         self.feature_dim = feature_dim or (self.BASE_DIM + len(self.COIN_INDEX))
 
     def build_vector(

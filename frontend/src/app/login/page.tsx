@@ -71,21 +71,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020504] flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 blur-[120px] rounded-full" />
       </div>
 
-      <Card className="w-full max-w-md bg-[#050B0A]/80 border-white/10 backdrop-blur-xl shadow-2xl relative z-10 overflow-hidden">
+      <Card className="w-full max-w-md glass-card relative z-10 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-blue-500" />
         
         <CardHeader className="space-y-3 pb-6 text-center">
-          <div className="mx-auto w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mb-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-            {step === 1 ? <Zap className="w-6 h-6 text-emerald-500" /> : <ShieldAlert className="w-6 h-6 text-emerald-500" />}
+          <div className="mx-auto w-12 h-12 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center mb-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+            {step === 1 ? <Zap className="w-6 h-6 text-primary" /> : <ShieldAlert className="w-6 h-6 text-primary" />}
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">APEX System</CardTitle>
-          <CardDescription className="text-white/40 uppercase tracking-widest text-[10px] font-bold">
+          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">APEX System</CardTitle>
+          <CardDescription className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold">
             {step === 1 ? "Secure Authentication Required" : "Two-Factor Verification"}
           </CardDescription>
         </CardHeader>
@@ -94,31 +94,31 @@ export default function LoginPage() {
           {step === 1 ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-xs font-bold text-white/70 uppercase tracking-wider">Username</Label>
+                <Label htmlFor="username" className="text-xs font-bold text-foreground/90 uppercase tracking-wider">Username</Label>
                 <Input 
                   id="username" 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-12 focus-visible:ring-emerald-500/50"
+                  className="bg-white/[0.03] border-white/[0.08] text-foreground placeholder:text-muted-foreground/60 h-12 focus-visible:ring-primary/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-xs font-bold text-white/70 uppercase tracking-wider">Password</Label>
+                <Label htmlFor="password" className="text-xs font-bold text-foreground/90 uppercase tracking-wider">Password</Label>
                 <Input 
                   id="password" 
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 h-12 focus-visible:ring-emerald-500/50"
+                  className="bg-white/[0.03] border-white/[0.08] text-foreground placeholder:text-muted-foreground/60 h-12 focus-visible:ring-primary/50"
                   placeholder="••••••••"
                 />
               </div>
               <Button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest text-xs mt-2"
+                className="w-full h-12 glass-button text-primary hover:text-primary text-black font-bold uppercase tracking-widest text-xs mt-2"
               >
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Authenticate"}
               </Button>
@@ -126,10 +126,10 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handleVerify2FA} className="space-y-4">
               <div className="space-y-2 text-center mb-6">
-                <p className="text-xs text-white/60">Enter the 6-digit code from your authenticator app.</p>
+                <p className="text-xs text-foreground/80">Enter the 6-digit code from your authenticator app.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="totp" className="text-xs font-bold text-white/70 uppercase tracking-wider">Authenticator Code</Label>
+                <Label htmlFor="totp" className="text-xs font-bold text-foreground/90 uppercase tracking-wider">Authenticator Code</Label>
                 <Input 
                   id="totp" 
                   autoFocus
@@ -137,14 +137,14 @@ export default function LoginPage() {
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/[^0-9]/g, ''))}
                   disabled={isLoading}
-                  className="bg-white/5 border-white/10 text-white text-center text-2xl tracking-[0.5em] font-mono h-14 focus-visible:ring-emerald-500/50"
+                  className="bg-white/[0.03] border-white/[0.08] text-foreground text-center text-2xl tracking-[0.5em] font-mono h-14 focus-visible:ring-primary/50"
                   placeholder="000000"
                 />
               </div>
               <Button 
                 type="submit" 
                 disabled={isLoading || totpCode.length !== 6}
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest text-xs mt-2"
+                className="w-full h-12 glass-button text-primary hover:text-primary text-black font-bold uppercase tracking-widest text-xs mt-2"
               >
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify Access"}
               </Button>

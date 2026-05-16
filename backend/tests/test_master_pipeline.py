@@ -11,7 +11,6 @@ from app.agents.technical import TechnicalAnalystAgent
 from app.agents.fundamental import FundamentalAnalystAgent
 from app.agents.sentiment import SentimentAnalystAgent
 from app.agents.risk_manager import RiskManagerAgent
-from app.agents.copy_trader import CopyTradingAgent
 from app.services.consensus import ConsensusEngine
 from app.services.regime_detector import RegimeDetector
 from app.services.regime_strategy import RegimeStrategy
@@ -30,26 +29,24 @@ def mock_all():
     fund = AsyncMock(spec=FundamentalAnalystAgent)
     sent = AsyncMock(spec=SentimentAnalystAgent)
     risk = AsyncMock(spec=RiskManagerAgent)
-    copy = AsyncMock(spec=CopyTradingAgent)
     
     # Mocking basic behavior
     tech.analyze.return_value = AgentSignal(agent_name="technical", symbol="BTC/USDT", signal="BUY", confidence=0.9, reasoning="MA Cross")
     fund.analyze.return_value = AgentSignal(agent_name="fundamental", symbol="BTC/USDT", signal="BUY", confidence=0.9, reasoning="ETF Inflow")
     sent.analyze.return_value = AgentSignal(agent_name="sentiment", symbol="BTC/USDT", signal="BUY", confidence=0.8, reasoning="Sentiment is high")
-    copy.analyze.return_value = AgentSignal(agent_name="copy_trader", symbol="BTC/USDT", signal="BUY", confidence=0.8, reasoning="Follow the whales")
     
     risk.analyze.return_value = RiskDecision(decision="APPROVE", max_position_size_usd=100.0, max_leverage=3, reasoning="Risk is fine")
     
     db = MagicMock() # Mock DB session
     scorer = MagicMock(spec=AgentScorer)
-    scorer.get_weights.return_value = {"technical": 0.3, "fundamental": 0.25, "sentiment": 0.2, "copy_trader": 0.25}
+    scorer.get_weights.return_value = {"technical": 0.4, "fundamental": 0.3, "sentiment": 0.3}
     
     consensus = ConsensusEngine()
     regime_det = RegimeDetector()
     regime_strat = RegimeStrategy()
     
     orchestrator = MasterOrchestrator(
-        ai, tech, fund, sent, risk, copy, consensus, regime_det, regime_strat, scorer
+        ai, tech, fund, sent, risk, consensus, regime_det, regime_strat, scorer
     )
     
     return {

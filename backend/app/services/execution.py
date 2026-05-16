@@ -190,6 +190,27 @@ class ExecutionEngine:
             self.db.commit()
             logger.info("order_executed_successfully", order_id=db_order.exchange_order_id, price=db_order.average_filled_price)
 
+            # --- REAL-TIME WEBSOCKET UPDATE ---
+            try:
+                from app.api.websocket import broadcast_updates
+                asyncio.create_task(broadcast_updates("position_update", {
+                    "type": "opened",
+                    "position": {
+                        "id": db_order.id,
+                        "symbol": db_order.symbol,
+                        "side": db_order.side,
+                        "size": db_order.requested_amount,
+                        "entry": db_order.average_filled_price or 0.0,
+                        "current": db_order.average_filled_price or 0.0,
+                        "leverage": db_order.leverage,
+                        "pnl": 0.0,
+                        "pnl_percent": 0.0,
+                        "status": "profit"
+                    }
+                }))
+            except Exception as we:
+                logger.warning("websocket_broadcast_failed", error=str(we))
+
             # Set SL / TP
             if stop_loss:
                 await self._set_stop_loss(symbol, side, amount, stop_loss)
@@ -257,6 +278,17 @@ class ExecutionEngine:
 
                 self.db.commit()
 
+                # --- REAL-TIME WEBSOCKET UPDATE ---
+                try:
+                    from app.api.websocket import broadcast_updates
+                    asyncio.create_task(broadcast_updates("position_update", {
+                        "type": "closed",
+                        "position_id": db_order.id,
+                        "symbol": symbol
+                    }))
+                except Exception as we:
+                    logger.warning("websocket_broadcast_failed", error=str(we))
+
                 # Fire learning pipeline for paper trades
                 self._fire_learning_event(db_order)
 
@@ -292,6 +324,17 @@ class ExecutionEngine:
 
                 self.db.commit()
                 logger.info("db_order_marked_closed", symbol=symbol, order_id=db_order.id)
+
+                # --- REAL-TIME WEBSOCKET UPDATE ---
+                try:
+                    from app.api.websocket import broadcast_updates
+                    asyncio.create_task(broadcast_updates("position_update", {
+                        "type": "closed",
+                        "position_id": db_order.id,
+                        "symbol": symbol
+                    }))
+                except Exception as we:
+                    logger.warning("websocket_broadcast_failed", error=str(we))
 
                 # Fire learning pipeline for live trades
                 self._fire_learning_event(db_order)

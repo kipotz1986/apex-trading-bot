@@ -9,7 +9,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 const COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" },
+  emerald: { bg: "bg-primary/10", border: "border-emerald-500/30", text: "text-primary" },
   blue: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" },
   amber: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400" },
   orange: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400" },
@@ -26,8 +26,8 @@ export function ModeBadge({ variant = "compact", className }: ModeBadgeProps) {
 
   if (isLoading || !profile) {
     return (
-      <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10", className)}>
-        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Loading mode…</span>
+      <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border", className)}>
+        <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest">Loading mode…</span>
       </div>
     )
   }
@@ -49,7 +49,7 @@ export function ModeBadge({ variant = "compact", className }: ModeBadgeProps) {
         <span className={cn("text-[10px] font-black uppercase tracking-widest", color.text)}>
           {profile.name}
         </span>
-        <span className="text-[9px] font-bold text-white/30">L{profile.risk_level}/5</span>
+        <span className="text-[9px] font-bold text-muted-foreground/80">L{profile.risk_level}/5</span>
       </div>
     )
   }
@@ -64,9 +64,9 @@ export function ModeBadge({ variant = "compact", className }: ModeBadgeProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={cn("text-sm font-bold", color.text)}>{profile.name}</span>
-            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Level {profile.risk_level}/5</span>
+            <span className="text-[9px] font-bold text-muted-foreground/80 uppercase tracking-widest">Level {profile.risk_level}/5</span>
           </div>
-          <p className="text-[11px] text-white/60 leading-relaxed">{profile.tagline}</p>
+          <p className="text-[11px] text-foreground/80 leading-relaxed">{profile.tagline}</p>
         </div>
       </div>
     </div>

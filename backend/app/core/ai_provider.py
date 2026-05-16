@@ -84,6 +84,8 @@ class AIProvider(ABC):
             return "gemini-1.5-pro"
         if "anthropic" in str(self.__class__).lower():
             return "claude-3-5-sonnet-20240620"
+        if "nvidia" in str(self.__class__).lower():
+            return "meta/llama-3.1-405b-instruct"
         return self.model
 
     @abstractmethod
@@ -119,6 +121,9 @@ def _create_provider(name: str, model: str, api_key: str) -> AIProvider:
     elif name == "anthropic":
         from app.core.providers.anthropic_provider import AnthropicProvider
         return AnthropicProvider(api_key=api_key, model=model)
+    elif name == "nvidia":
+        from app.core.providers.nvidia_provider import NvidiaProvider
+        return NvidiaProvider(api_key=api_key, model=model)
     else:
         raise ValueError(f"Unknown AI provider: '{name}'")
 

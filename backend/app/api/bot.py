@@ -23,11 +23,22 @@ async def get_bot_status(
     if not risk_state:
         raise HTTPException(status_code=404, detail="RiskState not initialized")
         
+    from app.services.bot_runner import bot_runner
+    from app.models.system_settings import SystemSettings
+    
+    db_interval = SystemSettings.get_value(db, "bot_interval_seconds")
+    interval = int(db_interval) if db_interval else bot_runner.interval
+
+    from app.api.websocket import current_bot_step
+    
     return {
         "status": risk_state.system_status,
         "mode": "LIVE" if risk_state.is_live_enabled else "PAPER",
         "last_updated": risk_state.last_updated,
-        "is_live_enabled": risk_state.is_live_enabled
+        "is_live_enabled": risk_state.is_live_enabled,
+        "last_run_at": risk_state.last_bot_run_at.isoformat() + "Z" if risk_state.last_bot_run_at else None,
+        "interval": interval,
+        "current_step": current_bot_step
     }
 
 def _get_risk_state(db: Session) -> RiskState:
@@ -105,6 +116,7 @@ async def toggle_mode(
 
         # Pre-flight: test the live credentials against the real exchange BEFORE committing the switch
         from app.services.exchange import ExchangeService
+        probe = None
         try:
             probe = ExchangeService(
                 api_key=key,
@@ -115,7 +127,6 @@ async def toggle_mode(
             if cred.base_url and "api-demo.bybit.com" in cred.base_url:
                 probe.exchange.enable_demo_trading(True)
             balance = await probe.get_balance()
-            await probe.close()
             logger.info("live_credential_preflight_ok", profile="live")
         except Exception as e:
             err = str(e)
@@ -124,6 +135,14 @@ async def toggle_mode(
                 status_code=400,
                 detail=f"Live credentials rejected by exchange: {err}. Check your API key/secret in Settings → Exchange → LIVE tab."
             )
+        finally:
+            # Always release the probe's aiohttp/ccxt session, even on failure,
+            # otherwise Bybit logs "Unclosed client session" warnings.
+            if probe is not None:
+                try:
+                    await probe.close()
+                except Exception as close_err:
+                    logger.warning("probe_close_failed", error=str(close_err))
 
         if ServiceFactory._instance:
             await ServiceFactory._instance.exchange.switch_profile("live", key, secret, cred.base_url)

@@ -30,6 +30,7 @@ class RiskState(Base):
     # Mode tracking
     is_live_enabled = Column(Boolean, default=False)
     paper_trading_started_at = Column(DateTime, default=datetime.utcnow)
+    last_bot_run_at = Column(DateTime, nullable=True)
     
     # Meta
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -32,8 +32,8 @@ export function BotControl() {
 
   if (isLoading) {
     return (
-      <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md">
-        <CardHeader className="border-b border-white/5 px-6 py-4">
+      <Card className="glass-card backdrop-blur-md">
+        <CardHeader className="border-b border-border/50 px-6 py-4">
           <Skeleton className="h-4 w-24" />
         </CardHeader>
         <CardContent className="p-6 space-y-8">
@@ -55,7 +55,7 @@ export function BotControl() {
       await toggleBot.mutateAsync(checked ? "start" : "stop")
       toast.success(checked ? "Bot Activated" : "Bot Deactivated", {
         description: checked ? "System is now monitoring markets." : "All algorithms paused.",
-        icon: checked ? <Zap className="w-4 h-4 text-emerald-500" /> : <ShieldAlert className="w-4 h-4 text-red-500" />
+        icon: checked ? <Zap className="w-4 h-4 text-primary" /> : <ShieldAlert className="w-4 h-4 text-red-500" />
       })
     } catch (err: any) {
       toast.error("Operation Failed", {
@@ -81,16 +81,16 @@ export function BotControl() {
   }
 
   return (
-    <Card className="bg-[#050B0A]/50 border-white/5 backdrop-blur-md overflow-hidden relative">
+    <Card className="glass-card backdrop-blur-md overflow-hidden relative">
       {/* Profile-switching overlay */}
       {switching && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm rounded-[inherit]">
-          <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-          <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Switching Profile…</span>
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <span className="text-[10px] font-bold text-foreground/80 uppercase tracking-widest">Switching Profile…</span>
         </div>
       )}
-      <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 px-6 py-4">
-        <CardTitle className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">
+      <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-6 py-4">
+        <CardTitle className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
           Master Control
         </CardTitle>
         <div className={cn(
@@ -102,15 +102,15 @@ export function BotControl() {
       
       <CardContent className="p-6 space-y-8">
         {/* Master Toggle */}
-        <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+        <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50">
           <div className="space-y-1">
-            <Label className="text-sm font-bold text-white tracking-tight">System Operation</Label>
-            <p className="text-[10px] font-medium text-white/30 uppercase tracking-widest">
+            <Label className="text-sm font-bold text-foreground tracking-tight">System Operation</Label>
+            <p className="text-[10px] font-medium text-muted-foreground/80 uppercase tracking-widest">
               {isRunning ? "Logic is active" : "System in standby"}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {toggleBot.isPending && <Loader2 className="w-4 h-4 animate-spin text-white/20" />}
+            {toggleBot.isPending && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground/60" />}
             <Switch 
               checked={isRunning} 
               onCheckedChange={handleToggle}
@@ -122,7 +122,7 @@ export function BotControl() {
 
         {/* Mode Selection */}
         <div className="space-y-4">
-          <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-500/50 pl-1">Execution Mode</Label>
+          <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/50 pl-1">Execution Mode</Label>
           <RadioGroup
             value={mode}
             onValueChange={handleModeChange}
@@ -134,7 +134,7 @@ export function BotControl() {
               <Label
                 htmlFor="paper"
                 className={cn(
-                  "flex flex-col items-center justify-between rounded-xl border-2 border-white/5 bg-transparent p-4 cursor-pointer hover:bg-white/5 transition-all text-white/40 peer-data-[state=checked]:border-emerald-500/50 peer-data-[state=checked]:bg-emerald-500/10 peer-data-[state=checked]:text-white",
+                  "flex flex-col items-center justify-between rounded-xl border-2 border-border/50 bg-transparent p-4 cursor-pointer hover:bg-muted/50 transition-all text-muted-foreground peer-data-[state=checked]:border-primary/50 peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-foreground",
                 )}
               >
                 <ShieldCheck className="mb-3 h-6 w-6" />
@@ -146,7 +146,7 @@ export function BotControl() {
               <Label
                 htmlFor="live"
                 className={cn(
-                  "flex flex-col items-center justify-between rounded-xl border-2 border-white/5 bg-transparent p-4 cursor-pointer hover:bg-white/5 transition-all text-white/40 peer-data-[state=checked]:border-blue-500/50 peer-data-[state=checked]:bg-blue-500/10 peer-data-[state=checked]:text-white",
+                  "flex flex-col items-center justify-between rounded-xl border-2 border-border/50 bg-transparent p-4 cursor-pointer hover:bg-muted/50 transition-all text-muted-foreground peer-data-[state=checked]:border-blue-500/50 peer-data-[state=checked]:bg-blue-500/10 peer-data-[state=checked]:text-foreground",
                 )}
               >
                 <Zap className="mb-3 h-6 w-6" />

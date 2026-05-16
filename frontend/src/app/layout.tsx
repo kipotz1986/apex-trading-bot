@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 
 import QueryProvider from "@/components/providers/QueryProvider";
 import AuthGuard from "@/components/providers/AuthGuard";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 export default function RootLayout({
   children,
@@ -20,15 +21,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <QueryProvider>
-          <AuthGuard>
-            {children}
-          </AuthGuard>
-        </QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthGuard>
+              {children}
+            </AuthGuard>
+          </QueryProvider>
+        </ThemeProvider>
         <Toaster theme="dark" position="top-right" richColors />
       </body>
     </html>

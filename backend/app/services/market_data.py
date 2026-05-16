@@ -9,6 +9,7 @@ Usage:
     candles = await market.get_candles("BTC/USDT", "1h", limit=200)
 """
 
+import asyncio
 from datetime import datetime
 from typing import Optional, List, Dict
 from app.services.exchange import ExchangeService
@@ -109,9 +110,11 @@ class MarketDataService:
         if timeframes is None:
             timeframes = list(SUPPORTED_TIMEFRAMES.keys())
 
-        result = {}
+        # Fetch in parallel to reduce loop duration and redundant API wait time
+        tasks = []
         for tf in timeframes:
             limit = SUPPORTED_TIMEFRAMES[tf]["candles"]
-            result[tf] = await self.get_candles(symbol, tf, limit)
-
-        return result
+            tasks.append(self.get_candles(symbol, tf, limit))
+        
+        candles_list = await asyncio.gather(*tasks)
+        return dict(zip(timeframes, candles_list))

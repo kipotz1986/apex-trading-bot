@@ -11,8 +11,7 @@ def test_consensus_unanimous_buy():
     signals = {
         "technical": AgentSignal(agent_name="technical", symbol="BTC/USDT", signal="BUY", confidence=1.0, reasoning="test"),
         "fundamental": AgentSignal(agent_name="fundamental", symbol="BTC/USDT", signal="BUY", confidence=1.0, reasoning="test"),
-        "sentiment": AgentSignal(agent_name="sentiment", symbol="BTC/USDT", signal="BUY", confidence=1.0, reasoning="test"),
-        "copy_trader": AgentSignal(agent_name="copy_trader", symbol="BTC/USDT", signal="BUY", confidence=1.0, reasoning="test")
+        "sentiment": AgentSignal(agent_name="sentiment", symbol="BTC/USDT", signal="BUY", confidence=1.0, reasoning="test")
     }
     
     result = engine.calculate(signals)

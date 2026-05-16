@@ -17,6 +17,7 @@ CHART_SYMBOLS = {
     "BTC/USDT": "BTCUSDT",
     "ETH/USDT": "ETHUSDT",
     "SOL/USDT": "SOLUSDT",
+    "XRP/USDT": "XRPUSDT",
 }
 
 # Bybit kline intervals to subscribe: 1m, 5m, 15m, 1h, 4h
@@ -31,7 +32,7 @@ class MarketStreamService:
     Channels emitted:
       • market_prices — tick price for open-position symbols
       • portfolio_update — equity/balance snapshot every 5 s
-      • kline — OHLCV candle updates for BTC/ETH/SOL
+      • kline — OHLCV candle updates for BTC/ETH/SOL/XRP
     """
 
     def __init__(self):
@@ -209,7 +210,12 @@ class MarketStreamService:
             if not risk_state:
                 return
 
-            open_positions = db.query(Order).filter(Order.status.in_(["OPEN", "FILLED"])).all()
+            is_paper_mode = not risk_state.is_live_enabled
+
+            open_positions = db.query(Order).filter(
+                Order.status.in_(["OPEN", "FILLED"]),
+                Order.is_paper == is_paper_mode
+            ).all()
             total_unrealized_pnl = 0.0
 
             for pos in open_positions:
@@ -229,7 +235,8 @@ class MarketStreamService:
             today_start = datetime.combine(datetime.now().date(), time.min)
             daily_closed_pnl = db.query(func.sum(Order.pnl_usd)).filter(
                 Order.status == "CLOSED",
-                Order.updated_at >= today_start
+                Order.updated_at >= today_start,
+                Order.is_paper == is_paper_mode
             ).scalar() or 0.0
 
             current_equity = risk_state.current_equity + total_unrealized_pnl
@@ -249,10 +256,11 @@ class MarketStreamService:
                     equity=current_equity,
                     balance=current_balance,
                     drawdown_pct=0.0,
+                    is_paper=is_paper_mode,
                 )
                 db.add(snapshot)
                 db.commit()
-                logger.debug("equity_snapshot_saved", equity=current_equity)
+                logger.debug("equity_snapshot_saved", equity=current_equity, is_paper=is_paper_mode)
 
         except Exception as e:
             logger.error("equity_broadcast_failed", error=str(e))
